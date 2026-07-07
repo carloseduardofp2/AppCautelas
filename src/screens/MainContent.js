@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { StatusBar, Text, TouchableOpacity, ScrollView, Modal, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { styles } from '../styles/MainStyles';
@@ -49,6 +49,8 @@ export default function MainContent() {
         abrirMenuExportacao,
         cautelasFiltradas,
         cautelasPendentes,
+        modalExportacaoVisivel, setModalExportacaoVisivel,
+        exportarTodas, abrirSelecaoPeriodo
     } = useCautelas();
 
     // --- TUDO relacionado à Reserva de Materiais vive neste outro hook ---
@@ -77,6 +79,11 @@ export default function MainContent() {
         salvarNovaPrateleira,
         pastasExibicao, itensExibicao,
         abrirOpcoesPasta, abrirOpcoesItem,
+        menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoExcluirMenu,
+        confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao,
+        modalEditarPastaVisivel, setModalEditarPastaVisivel,
+        nomeEdicaoPasta, setNomeEdicaoPasta,
+        salvarEdicaoPasta
     } = useMateriais();
 
     // ==========================================
@@ -123,6 +130,22 @@ export default function MainContent() {
                         itensExibicao={itensExibicao}
                         abrirOpcoesPasta={abrirOpcoesPasta}
                         abrirOpcoesItem={abrirOpcoesItem}
+                        
+                        
+                        menuVisivel={menuVisivel}
+                        itemMenu={itemMenu}
+                        fecharMenu={fecharMenu}
+                        acaoEditarMenu={acaoEditarMenu}
+                        acaoExcluirMenu={acaoExcluirMenu}
+                        confirmacaoVisivel={confirmacaoVisivel}
+                        setConfirmacaoVisivel={setConfirmacaoVisivel}
+                        dadosConfirmacao={dadosConfirmacao}
+
+                        modalEditarPastaVisivel={modalEditarPastaVisivel}
+                        setModalEditarPastaVisivel={setModalEditarPastaVisivel}
+                        nomeEdicaoPasta={nomeEdicaoPasta}
+                        setNomeEdicaoPasta={setNomeEdicaoPasta}
+                        salvarEdicaoPasta={salvarEdicaoPasta}
                     />
                 )}
 
@@ -152,6 +175,37 @@ export default function MainContent() {
                     }}
                 />
             )}
+
+            {/* ========================================== */}
+            {/* MODAL CUSTOMIZADO: EXPORTAR PDF (BOTTOM SHEET) */}
+            {/* ========================================== */}
+            <Modal visible={modalExportacaoVisivel} transparent animationType="slide">
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalExportacaoVisivel(false)}>
+                    <View style={styles.bottomSheetContent}>
+                        <Text style={styles.bottomSheetTitle}>Gerar Relatório</Text>
+
+                        <TouchableOpacity style={styles.bottomSheetButton} onPress={exportarTodas}>
+                            <Text style={styles.bottomSheetIcon}>📄</Text>
+                            <View>
+                                <Text style={styles.bottomSheetButtonText}>Todas as Cautelas</Text>
+                                <Text style={styles.bottomSheetButtonSub}>Exportar o livro completo em PDF</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.bottomSheetButton} onPress={abrirSelecaoPeriodo}>
+                            <Text style={styles.bottomSheetIcon}>📅</Text>
+                            <View>
+                                <Text style={styles.bottomSheetButtonText}>Escolher Período</Text>
+                                <Text style={styles.bottomSheetButtonSub}>Filtrar por data de início e fim</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.btnCancelarAdd} onPress={() => setModalExportacaoVisivel(false)}>
+                            <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
             {modalAssinatura && (
                 <ModalAssinatura

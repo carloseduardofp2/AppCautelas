@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { db } from '../services/firebaseConfig';
 import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, writeBatch } from 'firebase/firestore';
 import { removerAcentos } from '../utils/formatters';
@@ -37,6 +37,8 @@ export function useCautelas() {
     const [dataInicio, setDataInicio] = useState(new Date());
     const [dataFim, setDataFim] = useState(new Date());
     const [statusFiltro, setStatusFiltro] = useState(null);
+
+    const [modalExportacaoVisivel, setModalExportacaoVisivel] = useState(false);
 
     // --- CONEXÃO EM TEMPO REAL COM O FIRESTORE ---
     useEffect(() => {
@@ -92,7 +94,16 @@ export function useCautelas() {
         }
     };
 
-    function excluirCautela(id, militar) {
+    const excluirCautela = (id, militar) => {
+        if (Platform.OS === 'web') {
+            if (window.confirm(`Tem certeza que deseja apagar permanentemente a cautela de ${militar}?`)) {
+                deleteDoc(doc(db, 'cautelas', id))
+                    .then(() => window.alert("Sucesso: Registro removido da nuvem."))
+                    .catch(e => console.error(e));
+            }
+            return;
+        }
+
         Alert.alert(
             'Excluir Registro',
             `Tem certeza que deseja apagar permanentemente a cautela de ${militar}?`,
@@ -113,9 +124,26 @@ export function useCautelas() {
                 }
             ]
         );
-    }
+    };
 
-    async function excluirTodasCautelas() {
+    const excluirTodasCautelas = async () => {
+        if (Platform.OS === 'web') {
+            if (window.confirm("⚠️ LIMPEZA MENSAL\n\nTem certeza que deseja excluir TODAS as cautelas? Certifique-se de ter baixado o PDF antes!")) {
+                try {
+                    const batch = writeBatch(db);
+                    listaCautelas.forEach((cautela) => {
+                        const ref = doc(db, 'cautelas', cautela.id);
+                        batch.delete(ref);
+                    });
+                    await batch.commit();
+                    window.alert("Sucesso: Todas as cautelas foram removidas.");
+                } catch (error) {
+                    window.alert("Erro: Falha ao limpar o banco de dados.");
+                }
+            }
+            return;
+        }
+
         Alert.alert(
             "⚠️ Limpeza Mensal",
             "Tem certeza que deseja excluir TODAS as cautelas? Certifique-se de ter baixado o PDF antes!",
@@ -141,7 +169,7 @@ export function useCautelas() {
                 }
             ]
         );
-    }
+    };
 
     const handleAssinatura = async (signature, operacaoForcada = null) => {
         const operacao = operacaoForcada || tipoOperacao;
@@ -210,32 +238,24 @@ export function useCautelas() {
         }
     };
 
-    function abrirMenuExportacao() {
-        Alert.alert(
-            "Gerar Relatório",
-            "Como deseja exportar?",
-            [
-                {
-                    text: "Todas as Cautelas",
-                    onPress: () => exportarParaPDF(listaCautelas, isExportando, setIsExportando)
-                },
-                {
-                    text: "Escolher Período",
-                    onPress: () => {
-                        Alert.alert("Seleção de Data", "Primeiro, selecione a Data de Início e depois a Data Final.", [
-                            {
-                                text: "Entendido", onPress: () => {
-                                    setStatusFiltro('inicio');
-                                    setMostrarCalendario(true);
-                                }
-                            }
-                        ]);
-                    }
-                },
-                { text: "Cancelar", style: "cancel" }
-            ]
-        );
-    }
+    const abrirMenuExportacao = () => {
+        setModalExportacaoVisivel(true);
+    };
+
+    const exportarTodas = () => {
+        setModalExportacaoVisivel(false);
+        exportarParaPDF(listaCautelas, isExportando, setIsExportando);
+    };
+
+    const abrirSelecaoPeriodo = () => {
+        setModalExportacaoVisivel(false);
+        
+        // Pequeno atraso para a animação do modal fechar antes de abrir o calendário
+        setTimeout(() => {
+            setStatusFiltro('inicio');
+            setMostrarCalendario(true);
+        }, 300);
+    };
 
     const gerarRelatorioFiltrado = (inicio, fim) => {
         const inicioObj = new Date(inicio); inicioObj.setHours(0, 0, 0, 0);
@@ -295,5 +315,7 @@ export function useCautelas() {
         abrirMenuExportacao,
         cautelasFiltradas,
         cautelasPendentes,
+        modalExportacaoVisivel, setModalExportacaoVisivel,
+        exportarTodas, abrirSelecaoPeriodo
     };
 }

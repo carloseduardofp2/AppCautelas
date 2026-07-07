@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { db } from '../services/firebaseConfig';
 import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { removerAcentos } from '../utils/formatters';
@@ -32,6 +32,11 @@ export function useMateriais() {
     const [modalTipoAdicaoVisivel, setModalTipoAdicaoVisivel] = useState(false);
     const [modalNovaPrateleiraVisivel, setModalNovaPrateleiraVisivel] = useState(false);
     const [nomeNovaPrateleira, setNomeNovaPrateleira] = useState('');
+
+    // --- EDIÇÃO DE PRATELEIRAS ---
+    const [modalEditarPastaVisivel, setModalEditarPastaVisivel] = useState(false);
+    const [nomeEdicaoPasta, setNomeEdicaoPasta] = useState('');
+    const [pastaSendoEditada, setPastaSendoEditada] = useState(null);
 
     // --- CONEXÃO EM TEMPO REAL COM O FIRESTORE ---
     useEffect(() => {
@@ -159,27 +164,119 @@ export function useMateriais() {
         }
     }
 
-    function excluirMaterial(id, item) {
-        Alert.alert(
-            'Remover do Estoque',
-            `Deseja permanentemente excluir o item ${item} do sistema?`,
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Excluir',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await deleteDoc(doc(db, 'materiais', id));
-                            Alert.alert("Sucesso", "Item removido do estoque.");
-                        } catch (error) {
-                            console.error(error);
-                            Alert.alert("Erro", "Falha ao remover item.");
-                        }
-                    }
+    // ==========================================
+    // --- NOVOS ESTADOS PARA MODAIS CUSTOMIZADOS ---
+    // ==========================================
+    const [menuVisivel, setMenuVisivel] = useState(false);
+    const [itemMenu, setItemMenu] = useState(null); // Guarda se é pasta ou item
+    
+    const [confirmacaoVisivel, setConfirmacaoVisivel] = useState(false);
+    const [dadosConfirmacao, setDadosConfirmacao] = useState({ titulo: '', msg: '', acao: null });
+
+    function abrirOpcoesPasta(pasta) {
+        setItemMenu({ tipo: 'pasta', dados: pasta });
+        setMenuVisivel(true);
+    }
+
+    function abrirOpcoesItem(material) {
+        setItemMenu({ tipo: 'item', dados: material });
+        setMenuVisivel(true);
+    }
+
+    function fecharMenu() {
+        setMenuVisivel(false);
+        setItemMenu(null);
+    }
+
+    function acaoEditarMenu() {
+        const item = itemMenu;
+        setMenuVisivel(false); 
+        
+        setTimeout(() => {
+            if (item.tipo === 'pasta') {
+                setPastaSendoEditada(item.dados);
+                setNomeEdicaoPasta(item.dados.nome); // Preenche o input com o nome atual
+                setModalEditarPastaVisivel(true);
+            } else {
+                prepararEdicaoMaterial(item.dados);
+            }
+        }, 300); 
+    }
+
+    async function salvarEdicaoPasta() {
+        if (nomeEdicaoPasta.trim() === '') {
+            Alert.alert('Atenção', 'O nome da pasta não pode ser vazio.');
+            return;
+        }
+
+        try {
+            const ehNivel1 = pastaSendoEditada.path.length === 1;
+            let qItensRef;
+
+            // Busca TODOS os itens que estão dentro desta pasta
+            if (ehNivel1) {
+                qItensRef = query(collection(db, 'materiais'), where('localizacao', '==', pastaSendoEditada.nome));
+            } else {
+                qItensRef = query(collection(db, 'materiais'),
+                    where('localizacao', '==', pastaSendoEditada.path[0]),
+                    where('subLocalizacao', '==', pastaSendoEditada.nome)
+                );
+            }
+
+            const querySnapshot = await getDocs(qItensRef);
+            
+            // Prepara a atualização de todos os itens encontrados
+            const promessasAtualizacao = querySnapshot.docs.map(documento => {
+                const ref = doc(db, 'materiais', documento.id);
+                if (ehNivel1) {
+                    return updateDoc(ref, { localizacao: nomeEdicaoPasta.trim() });
+                } else {
+                    return updateDoc(ref, { subLocalizacao: nomeEdicaoPasta.trim() });
                 }
-            ]
-        );
+            });
+
+            // Executa todas as atualizações de uma vez
+            await Promise.all(promessasAtualizacao);
+
+            // Limpa o modal e joga o usuário para o início (para não ficar preso em um caminho que mudou de nome)
+            setModalEditarPastaVisivel(false);
+            setPastaSendoEditada(null);
+            setNomeEdicaoPasta('');
+            setCaminhoMateriais([]); 
+            
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Erro", "Não foi possível renomear a pasta.");
+        }
+    }
+
+    function acaoExcluirMenu() {
+        const item = itemMenu;
+        setMenuVisivel(false); // Esconde o menu de opções
+        
+        // Configura e abre o Modal de Confirmação customizado
+        setTimeout(() => {
+            if (item.tipo === 'pasta') {
+                setDadosConfirmacao({
+                    titulo: 'Excluir Local',
+                    msg: `Tem certeza que deseja excluir "${item.dados.nome}" e TODOS os materiais dentro dela?`,
+                    acao: async () => {
+                        setConfirmacaoVisivel(false);
+                        await executarExclusaoPasta(item.dados);
+                    }
+                });
+            } else {
+                setDadosConfirmacao({
+                    titulo: 'Remover do Estoque',
+                    msg: `Deseja permanentemente excluir o item ${item.dados.item}?`,
+                    acao: async () => {
+                        setConfirmacaoVisivel(false);
+                        await deleteDoc(doc(db, 'materiais', item.dados.id));
+                    }
+                });
+            }
+            setConfirmacaoVisivel(true);
+        }, 300);
     }
 
     async function executarExclusaoPasta(pasta) {
@@ -198,56 +295,10 @@ export function useMateriais() {
 
             const querySnapshot = await getDocs(qItensRef);
             const promessasDelecao = querySnapshot.docs.map(documento => deleteDoc(doc(db, 'materiais', documento.id)));
-
             await Promise.all(promessasDelecao);
-            Alert.alert("Sucesso", "Local e seus itens foram removidos.");
         } catch (error) {
             console.error(error);
-            Alert.alert("Erro", "Não foi possível excluir a pasta.");
         }
-    }
-
-    async function confirmarExclusaoPasta(pasta) {
-        Alert.alert(
-            "Excluir Local",
-            `Tem certeza que deseja excluir "${pasta.nome}" e TODOS os materiais dentro dela?`,
-            [
-                { text: "Cancelar", style: "cancel" },
-                { text: "Excluir", style: "destructive", onPress: () => executarExclusaoPasta(pasta) }
-            ]
-        );
-    }
-
-    function prepararEdicaoPasta(pasta) {
-        Alert.alert("Em Breve", "A funcionalidade de renomear pastas estará disponível na próxima atualização.");
-    }
-
-    function abrirOpcoesPasta(pasta) {
-        Alert.alert(
-            `Pasta: ${pasta.nome}`,
-            "O que deseja fazer?",
-            [
-                { text: "✏️ Editar", onPress: () => prepararEdicaoPasta(pasta) },
-                {
-                    text: "🗑️ Excluir",
-                    onPress: () => confirmarExclusaoPasta(pasta),
-                    style: 'destructive'
-                },
-                { text: "Cancelar", style: "cancel" }
-            ]
-        );
-    }
-
-    function abrirOpcoesItem(material) {
-        Alert.alert(
-            material.item,
-            `Qtd: ${material.quantidade}\nObs: ${material.observacao || 'Nenhuma'}`,
-            [
-                { text: "✏️ Editar", onPress: () => prepararEdicaoMaterial(material) },
-                { text: "🗑️ Excluir", onPress: () => excluirMaterial(material.id, material.item), style: 'destructive' },
-                { text: "Cancelar", style: "cancel" }
-            ]
-        );
     }
 
     const obterItensExibicao = () => {
@@ -341,6 +392,16 @@ export function useMateriais() {
         nomeNovaPrateleira, setNomeNovaPrateleira,
         salvarNovaPrateleira,
         pastasExibicao, itensExibicao,
-        abrirOpcoesPasta, abrirOpcoesItem,
+        abrirOpcoesPasta, abrirOpcoesItem,menuVisivel, 
+        itemMenu, 
+        fecharMenu, 
+        acaoEditarMenu, 
+        acaoExcluirMenu,
+        confirmacaoVisivel, 
+        setConfirmacaoVisivel, 
+        dadosConfirmacao,
+        modalEditarPastaVisivel, setModalEditarPastaVisivel,
+        nomeEdicaoPasta, setNomeEdicaoPasta,
+        salvarEdicaoPasta
     };
 }

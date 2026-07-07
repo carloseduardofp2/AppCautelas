@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
-export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem }) {
+export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem, menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoExcluirMenu,
+  confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao, modalEditarPastaVisivel, setModalEditarPastaVisivel, nomeEdicaoPasta, setNomeEdicaoPasta, salvarEdicaoPasta }) {
   return (
     <View style={styles.secaoContainer}>
       <Text style={styles.tituloSecao}>RESERVA DE MATERIAIS</Text>
@@ -90,6 +91,88 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
           <Text style={styles.noResultsText}>Adicione objetos ou contentores aqui!</Text>
         </View>
       )}
+
+      {/* ========================================== */}
+      {/* 1. MODAL CUSTOMIZADO: MENU DE OPÇÕES (BOTTOM SHEET) */}
+      {/* ========================================== */}
+      <Modal visible={menuVisivel} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={fecharMenu}>
+          <View style={styles.bottomSheetContent}>
+            <Text style={styles.bottomSheetTitle}>
+              {itemMenu?.tipo === 'pasta' ? `Pasta: ${itemMenu.dados.nome}` : itemMenu?.dados.item}
+            </Text>
+
+            <TouchableOpacity style={styles.bottomSheetButton} onPress={acaoEditarMenu}>
+              <Text style={styles.bottomSheetIcon}>✏️</Text>
+              <Text style={styles.bottomSheetButtonText}>Editar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.bottomSheetButton} onPress={acaoExcluirMenu}>
+              <Text style={styles.bottomSheetIcon}>🗑️</Text>
+              <Text style={[styles.bottomSheetButtonText, { color: '#F87171' }]}>Excluir</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.btnCancelarAdd} onPress={fecharMenu}>
+              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ========================================== */}
+      {/* 2. MODAL CUSTOMIZADO: CONFIRMAÇÃO DE EXCLUSÃO */}
+      {/* ========================================== */}
+      <Modal visible={confirmacaoVisivel} transparent animationType="fade">
+        <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{dadosConfirmacao.titulo}</Text>
+            
+            <Text style={{ color: '#E2E8F0', fontSize: 16, textAlign: 'center', marginBottom: 25 }}>
+              {dadosConfirmacao.msg}
+            </Text>
+            
+            <View style={styles.modalBotoes}>
+              <TouchableOpacity style={styles.btnCancelar} onPress={() => setConfirmacaoVisivel(false)}>
+                <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={[styles.btnSalvar, { backgroundColor: '#7F1D1D' }]} onPress={dadosConfirmacao.acao}>
+                <Text style={[styles.btnSalvarTexto, { color: '#FFF' }]}>Sim, Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================== */}
+      {/* 3. MODAL CUSTOMIZADO: RENOMEAR PASTA */}
+      {/* ========================================== */}
+      <Modal visible={modalEditarPastaVisivel} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: 30 }]}>
+            <Text style={styles.modalTitle}>Renomear Local</Text>
+            
+            <TextInput
+                style={styles.input}
+                placeholder="Digite o novo nome..."
+                placeholderTextColor="#64748B"
+                value={nomeEdicaoPasta}
+                onChangeText={setNomeEdicaoPasta}
+                autoFocus={true}
+            />
+            
+            <View style={styles.modalBotoes}>
+              <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalEditarPastaVisivel(false)}>
+                <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.btnSalvar} onPress={salvarEdicaoPasta}>
+                <Text style={styles.btnSalvarTexto}>Salvar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

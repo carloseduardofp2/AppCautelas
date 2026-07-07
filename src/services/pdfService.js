@@ -1,6 +1,6 @@
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 export async function exportarParaPDF(listaCautelas, isExportando, setIsExportando) {
   if (isExportando) return;
@@ -72,6 +72,34 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
         </html>
       `;
 
+    // --- SOLUÇÃO HÍBRIDA (WEB E CELULAR) ---
+    if (Platform.OS === 'web') {
+        // Na Web: Cria um quadro invisível com o HTML puro para não vazar o visual do app
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+        
+        iframe.contentWindow.document.open();
+        iframe.contentWindow.document.write(html);
+        iframe.contentWindow.document.close();
+        
+        // Aguarda meio segundo para as assinaturas carregarem antes de gerar o PDF
+        setTimeout(() => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
+            setIsExportando(false);
+        }, 500);
+
+        return; // Encerra a função aqui para a Web
+    }
+
+    // --- SEU CÓDIGO ORIGINAL INTACTO PARA O CELULAR ---
     const { uri } = await Print.printToFileAsync({ html });
     const isAvailable = await Sharing.isAvailableAsync();
 
@@ -80,10 +108,13 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
     } else {
       Alert.alert("Erro", "O compartilhamento não está disponível.");
     }
+
   } catch (error) {
     console.error("Erro na exportação:", error);
     Alert.alert("Erro", "Não foi possível gerar o PDF.");
   } finally {
-    setIsExportando(false);
+    if (Platform.OS !== 'web') {
+        setIsExportando(false);
+    }
   }
 }

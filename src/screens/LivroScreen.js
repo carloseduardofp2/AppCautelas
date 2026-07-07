@@ -99,7 +99,7 @@ export default function LivroScreen({ pesquisa, setPesquisa, cautelasFiltradas, 
 
               <TouchableOpacity
                 style={styles.btnExcluir}
-                onPress={() => excluirCautela(cautela.id, cautela.militar)}
+                onPress={() => solicitarExclusao(cautela)}
               >
                 <Text style={styles.btnExcluirTexto}>🗑️ Excluir</Text>
               </TouchableOpacity>
