@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
-export default function LivroScreen({ pesquisa, setPesquisa, cautelasFiltradas, excluirCautela, setIdCautelaParaAssinar, setTipoOperacao, setModalAssinatura }) {
+export default function LivroScreen({ pesquisa, setPesquisa, cautelasFiltradas, solicitarExclusao, setIdCautelaParaAssinar, setTipoOperacao, setModalAssinatura }) {
   return (
     <View style={styles.secaoContainer}>
       <Text style={styles.tituloSecao}>LIVRO DE CAUTELAS</Text>

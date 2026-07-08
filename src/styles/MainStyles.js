@@ -29,15 +29,16 @@ export const styles = StyleSheet.create({
     btnExcluirTexto: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
     btnBaixa: { backgroundColor: '#059669', padding: 12, borderRadius: 8, marginTop: 15, alignItems: 'center', borderWidth: 1, borderColor: '#047857' },
     btnBaixaTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-botaoFlutuanteTexto: { 
+    
+    botaoFlutuanteTexto: { 
         color: '#0F172A', 
         fontSize: 40, 
         fontWeight: 'bold', 
-        // Mantém 32 no celular, mas aumenta na web para o navegador não cortar a letra
-        lineHeight: Platform.OS === 'web' ? 45 : 32, 
-        // Um leve empurrãozinho para baixo apenas na versão Web para centralizar perfeitamente
-        marginTop: Platform.OS === 'web' ? -4 : 0 
+        // Deslocamos o texto para cima APENAS na Web para corrigir a margem fantasma do navegador.
+        // Se ainda ficar baixo, mude o -4 para -6. Se subir demais, mude para -2.
+        transform: [{ translateY: Platform.OS === 'web' ? -4 : 0 }],
     },
+
     footer: {
         flexDirection: 'row',
         backgroundColor: '#0F172A',
@@ -77,10 +78,10 @@ botaoFlutuanteTexto: {
     inputRow: { flexDirection: 'row', justifyContent: 'space-between' },
     inputArea: { height: 80, textAlignVertical: 'top' },
     modalBotoes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingBottom: 15 },
-    btnCancelar: { flex: 1, padding: 15, borderRadius: 8, backgroundColor: '#334155', marginRight: 10, alignItems: 'center' },
-    btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+    btnCancelar: { flex: 1, padding: 15, borderRadius: 8, backgroundColor: '#334155', marginRight: 10, alignItems: 'center', },
+    btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', height: 50, lineHeight: 50, textAlignVertical: 'center' },
     btnSalvar: { flex: 1, padding: 15, borderRadius: 8, backgroundColor: '#D4A25F', alignItems: 'center' },
-    btnSalvarTexto: { color: '#0F172A', fontSize: 16, fontWeight: 'bold' },
+    btnSalvarTexto: { color: '#0F172A', fontSize: 16, fontWeight: 'bold', height: 50, lineHeight: 50, textAlignVertical: 'center' },
 
     btnAssinarDepois: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#D4A25F', borderWidth: 1, borderColor: '#e79326' },
     btnAssinarDepoisTexto: { color: '#0F172A', fontSize: 12, fontWeight: '600' },
@@ -142,8 +143,10 @@ botaoFlutuanteTexto: {
         shadowOpacity: 0.3,
         shadowRadius: 3,
     },
+    
     miniFabIcon: {
-        fontSize: 20,
+        fontSize: 27,
+        transform: [{ translateY: Platform.OS === 'web' ? -2 : 0 }],
     },
 
     // ---------- BOTTOM SHEET ----------

@@ -43,14 +43,15 @@ export default function MainContent() {
         dataSelecionada, mostrarCalendario, setMostrarCalendario,
         dataInicio, dataFim, statusFiltro,
         aoMudarData,
-        excluirCautela,
-        excluirTodasCautelas,
+        solicitarExclusao,
+        solicitarExclusaoTodas  ,
         handleAssinatura,
         abrirMenuExportacao,
         cautelasFiltradas,
         cautelasPendentes,
         modalExportacaoVisivel, setModalExportacaoVisivel,
-        exportarTodas, abrirSelecaoPeriodo
+        exportarTodas, abrirSelecaoPeriodo,
+        modalConfirmacaoCautela, setModalConfirmacaoCautela, dadosConfirmacaoCautela
     } = useCautelas();
 
     // --- TUDO relacionado à Reserva de Materiais vive neste outro hook ---
@@ -104,7 +105,7 @@ export default function MainContent() {
                         pesquisa={pesquisa}
                         setPesquisa={setPesquisa}
                         cautelasFiltradas={cautelasFiltradas}
-                        excluirCautela={excluirCautela}
+                        solicitarExclusao={solicitarExclusao}
                         setIdCautelaParaAssinar={setIdCautelaParaAssinar}
                         setTipoOperacao={setTipoOperacao}
                         setModalAssinatura={setModalAssinatura}
@@ -245,6 +246,28 @@ export default function MainContent() {
                 salvarNovaPrateleira={salvarNovaPrateleira}
             />
 
+            {/* ========================================== */}
+            {/* MODAL DE CONFIRMAÇÃO PARA CAUTELAS */}
+            {/* ========================================== */}
+            <Modal visible={modalConfirmacaoCautela} transparent animationType="fade">
+                <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>{dadosConfirmacaoCautela.titulo}</Text>
+                        <Text style={{ color: '#E2E8F0', fontSize: 16, textAlign: 'center', marginBottom: 25 }}>
+                            {dadosConfirmacaoCautela.msg}
+                        </Text>
+                        <View style={styles.modalBotoes}>
+                            <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalConfirmacaoCautela(false)}>
+                                <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.btnSalvar, { backgroundColor: '#7F1D1D' }]} onPress={dadosConfirmacaoCautela.acao}>
+                                <Text style={[styles.btnSalvarTexto, { color: '#FFF' }]}>Sim, Excluir</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            
             {/* COMPONENTE FOOTER */}
             <Footer abaAtiva={abaAtiva} setAbaAtiva={setAbaAtiva} />
 
@@ -263,7 +286,7 @@ export default function MainContent() {
                 <MenuFlutuanteLivro
                     onNovaCautela={() => setModalVisivel(true)}
                     onExportarPDF={abrirMenuExportacao}
-                    onExcluirTodas={excluirTodasCautelas}
+                    onExcluirTodas={solicitarExclusaoTodas}
                 />
             )}
 

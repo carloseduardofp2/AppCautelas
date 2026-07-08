@@ -13,6 +13,9 @@ export function useCautelas() {
     const [isExportando, setIsExportando] = useState(false);
     const [pesquisa, setPesquisa] = useState('');
 
+    const [modalConfirmacaoCautela, setModalConfirmacaoCautela] = useState(false);
+    const [dadosConfirmacaoCautela, setDadosConfirmacaoCautela] = useState({ titulo: '', msg: '', acao: null });
+
     // --- FORMULÁRIO DE NOVA CAUTELA ---
     const [modalVisivel, setModalVisivel] = useState(false);
     const [novoMilitar, setNovoMilitar] = useState('');
@@ -94,41 +97,28 @@ export function useCautelas() {
         }
     };
 
-    const excluirCautela = (id, militar) => {
-        if (Platform.OS === 'web') {
-            if (window.confirm(`Tem certeza que deseja apagar permanentemente a cautela de ${militar}?`)) {
-                deleteDoc(doc(db, 'cautelas', id))
-                    .then(() => window.alert("Sucesso: Registro removido da nuvem."))
-                    .catch(e => console.error(e));
-            }
-            return;
-        }
-
-        Alert.alert(
-            'Excluir Registro',
-            `Tem certeza que deseja apagar permanentemente a cautela de ${militar}?`,
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Excluir',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await deleteDoc(doc(db, 'cautelas', id));
-                            Alert.alert("Sucesso", "Registro removido da nuvem.");
-                        } catch (error) {
-                            console.error(error);
-                            Alert.alert("Erro", "Falha ao excluir do banco de dados.");
-                        }
-                    }
+    const solicitarExclusao = (cautela) => {
+        setDadosConfirmacaoCautela({
+            titulo: "Excluir Cautela",
+            msg: `Deseja realmente excluir a cautela de ${cautela.militar}?`,
+            acao: async () => {
+                setModalConfirmacaoCautela(false);
+                try {
+                    await deleteDoc(doc(db, 'cautelas', cautela.id));
+                } catch (error) {
+                    console.error(error);
                 }
-            ]
-        );
+            }
+        });
+        setModalConfirmacaoCautela(true);
     };
 
-    const excluirTodasCautelas = async () => {
-        if (Platform.OS === 'web') {
-            if (window.confirm("⚠️ LIMPEZA MENSAL\n\nTem certeza que deseja excluir TODAS as cautelas? Certifique-se de ter baixado o PDF antes!")) {
+    const solicitarExclusaoTodas = () => {
+        setDadosConfirmacaoCautela({
+            titulo: "⚠️ Limpeza Mensal",
+            msg: "Tem certeza que deseja excluir TODAS as cautelas? Esta ação é irreversível.",
+            acao: async () => {
+                setModalConfirmacaoCautela(false);
                 try {
                     const batch = writeBatch(db);
                     listaCautelas.forEach((cautela) => {
@@ -136,40 +126,13 @@ export function useCautelas() {
                         batch.delete(ref);
                     });
                     await batch.commit();
-                    window.alert("Sucesso: Todas as cautelas foram removidas.");
                 } catch (error) {
-                    window.alert("Erro: Falha ao limpar o banco de dados.");
+                    console.error(error);
                 }
             }
-            return;
-        }
-
-        Alert.alert(
-            "⚠️ Limpeza Mensal",
-            "Tem certeza que deseja excluir TODAS as cautelas? Certifique-se de ter baixado o PDF antes!",
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Sim, Excluir Tudo",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            const batch = writeBatch(db);
-                            listaCautelas.forEach((cautela) => {
-                                const ref = doc(db, 'cautelas', cautela.id);
-                                batch.delete(ref);
-                            });
-                            await batch.commit();
-                            Alert.alert("Sucesso", "Todas as cautelas foram removidas.");
-                        } catch (error) {
-                            console.error(error);
-                            Alert.alert("Erro", "Falha ao limpar o banco de dados.");
-                        }
-                    }
-                }
-            ]
-        );
-    };
+        });
+        setModalConfirmacaoCautela(true);
+    };  
 
     const handleAssinatura = async (signature, operacaoForcada = null) => {
         const operacao = operacaoForcada || tipoOperacao;
@@ -309,8 +272,9 @@ export function useCautelas() {
         dataSelecionada, mostrarCalendario, setMostrarCalendario,
         dataInicio, dataFim, statusFiltro,
         aoMudarData,
-        excluirCautela,
-        excluirTodasCautelas,
+        solicitarExclusao, solicitarExclusaoTodas,
+        modalConfirmacaoCautela, setModalConfirmacaoCautela, 
+        dadosConfirmacaoCautela,
         handleAssinatura,
         abrirMenuExportacao,
         cautelasFiltradas,
