@@ -1,8 +1,34 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, Dimensions } from 'react-native';
+
+// Mede a tela para saber se é um monitor (PC) ou tela de celular
+const larguraTela = Dimensions.get('window').width;
+const isDesktopWeb = Platform.OS === 'web' && larguraTela > 768;
 
 export const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#0F172A' },
-    header: { backgroundColor: '#0F172A', padding: 15, paddingTop: 10, borderBottomWidth: 2.5, borderBottomColor: '#D4A25F' },
+// Encontre o 'header' e adicione o alignItems, justifyContent e position:
+    header: { 
+        backgroundColor: '#0F172A', 
+        padding: 15, 
+        paddingTop: 10, 
+        borderBottomWidth: 2.5, 
+        borderBottomColor: '#D4A25F',
+        justifyContent: 'center', // Garante que o texto fique centralizado
+        alignItems: 'center',     // Garante que o texto fique centralizado
+        position: 'relative'      // Permite que o logo flutue sobre ele
+    },
+    
+    // Adicione esta NOVA classe em qualquer lugar (pode ser logo abaixo do header):
+    headerLogo: {
+        position: 'absolute',
+        left: 30,       // Posiciona na ESQUERDA (onde você desenhou o círculo)
+        // right: 20,   // Se preferir na DIREITA, apague o 'left: 20' e descomente esta linha
+        top: '15%',     // Empurra para a metade
+        marginTop: 0,  // Ajuste fino para alinhar perfeitamente com os textos
+        width: 65,      // Largura da imagem
+        height: 65,     // Altura da imagem
+    },
+
     headerTitle: { color: '#ffffff', fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
     headerSubtitle: { color: '#94A3B8', fontSize: 18, textAlign: 'center', marginTop: 5 },
     body: { flex: 1, backgroundColor: '#0F172A' },
@@ -34,9 +60,8 @@ export const styles = StyleSheet.create({
         color: '#0F172A', 
         fontSize: 40, 
         fontWeight: 'bold', 
-        // Deslocamos o texto para cima APENAS na Web para corrigir a margem fantasma do navegador.
-        // Se ainda ficar baixo, mude o -4 para -6. Se subir demais, mude para -2.
-        transform: [{ translateY: Platform.OS === 'web' ? -4 : 0 }],
+        // Aplica a correção de -4 APENAS se for Web no Computador. No celular fica 0 (perfeito).
+        transform: [{ translateY: isDesktopWeb ? -4 : 0 }],
     },
 
     footer: {
@@ -146,7 +171,7 @@ export const styles = StyleSheet.create({
     
     miniFabIcon: {
         fontSize: 27,
-        transform: [{ translateY: Platform.OS === 'web' ? -2 : 0 }],
+        transform: [{ translateY: isDesktopWeb ? -2 : 0 }],
     },
 
     // ---------- BOTTOM SHEET ----------
