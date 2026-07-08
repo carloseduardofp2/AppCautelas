@@ -59,7 +59,6 @@ export const styles = StyleSheet.create({
     botaoFlutuanteTexto: { 
         color: '#0F172A', 
         fontSize: 40,
-        bottom: 4,
         fontWeight: 'bold', 
         // Aplica a correção de -4 APENAS se for Web no Computador. No celular fica 0 (perfeito).
         transform: [{ translateY: isDesktopWeb ? -4 : 0 }],
