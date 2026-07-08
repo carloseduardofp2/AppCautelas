@@ -21,7 +21,7 @@ export const styles = StyleSheet.create({
     // Adicione esta NOVA classe em qualquer lugar (pode ser logo abaixo do header):
     headerLogo: {
         position: 'absolute',
-        left: 30,       // Posiciona na ESQUERDA (onde você desenhou o círculo)
+        left: 15,       // Posiciona na ESQUERDA (onde você desenhou o círculo)
         // right: 20,   // Se preferir na DIREITA, apague o 'left: 20' e descomente esta linha
         top: '15%',     // Empurra para a metade
         marginTop: 0,  // Ajuste fino para alinhar perfeitamente com os textos
@@ -58,7 +58,8 @@ export const styles = StyleSheet.create({
     
     botaoFlutuanteTexto: { 
         color: '#0F172A', 
-        fontSize: 40, 
+        fontSize: 40,
+        bottom: 4,
         fontWeight: 'bold', 
         // Aplica a correção de -4 APENAS se for Web no Computador. No celular fica 0 (perfeito).
         transform: [{ translateY: isDesktopWeb ? -4 : 0 }],
@@ -78,14 +79,14 @@ export const styles = StyleSheet.create({
     footerButtonTextActive: { color: '#D4A25F', fontWeight: 'bold' },
     botaoFlutuanteBase: {
         position: 'absolute',
-        bottom: 115,
+        bottom: 90, // Ajuste a altura conforme necessário
         width: 60,
         height: 60,
         borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,
-        zIndex: 10,
+        zIndex: 15,
         backgroundColor: '#D4A25F',
     },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
@@ -130,7 +131,7 @@ export const styles = StyleSheet.create({
         bottom: 170, // Altura em relação ao botão +
         right: 30,  // Alinhado com o botão +
         alignItems: 'flex-end', // Alinha tudo à direita
-        zIndex: 10,
+        zIndex: 15,
     },
     fabItemContainer: {
         flexDirection: 'row',
