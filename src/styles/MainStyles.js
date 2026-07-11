@@ -6,18 +6,18 @@ const isDesktopWeb = Platform.OS === 'web' && larguraTela > 768;
 
 export const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#0F172A' },
-// Encontre o 'header' e adicione o alignItems, justifyContent e position:
-    header: { 
-        backgroundColor: '#0F172A', 
-        padding: 15, 
-        paddingTop: 10, 
-        borderBottomWidth: 2.5, 
+    // Encontre o 'header' e adicione o alignItems, justifyContent e position:
+    header: {
+        backgroundColor: '#0F172A',
+        padding: 15,
+        paddingTop: 10,
+        borderBottomWidth: 2.5,
         borderBottomColor: '#D4A25F',
         justifyContent: 'center', // Garante que o texto fique centralizado
         alignItems: 'center',     // Garante que o texto fique centralizado
         position: 'relative'      // Permite que o logo flutue sobre ele
     },
-    
+
     // Adicione esta NOVA classe em qualquer lugar (pode ser logo abaixo do header):
     headerLogo: {
         position: 'absolute',
@@ -55,11 +55,11 @@ export const styles = StyleSheet.create({
     btnExcluirTexto: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
     btnBaixa: { backgroundColor: '#059669', padding: 12, borderRadius: 8, marginTop: 15, alignItems: 'center', borderWidth: 1, borderColor: '#047857' },
     btnBaixaTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-    
-    botaoFlutuanteTexto: { 
-        color: '#0F172A', 
+
+    botaoFlutuanteTexto: {
+        color: '#0F172A',
         fontSize: 40,
-        fontWeight: 'bold', 
+        fontWeight: 'bold',
         // Aplica a correção de -4 APENAS se for Web no Computador. No celular fica 0 (perfeito).
         transform: [{ translateY: isDesktopWeb ? -4 : 0 }],
     },
@@ -98,15 +98,35 @@ export const styles = StyleSheet.create({
         borderColor: '#334155',
         maxHeight: '90%'
     },
-    modalTitle: { color: '#D4A25F', fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+
     input: { backgroundColor: '#0F172A', color: '#FFFFFF', borderWidth: 1, borderColor: '#334155', borderRadius: 8, padding: 15, marginBottom: 15, fontSize: 16 },
     inputRow: { flexDirection: 'row', justifyContent: 'space-between' },
     inputArea: { height: 80, textAlignVertical: 'top' },
-    modalBotoes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingBottom: 15 },
-    btnCancelar: { flex: 1, padding: 15, borderRadius: 8, backgroundColor: '#334155', marginRight: 10, alignItems: 'center', },
-    btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', height: 50, lineHeight: 50, textAlignVertical: 'center' },
-    btnSalvar: { flex: 1, padding: 15, borderRadius: 8, backgroundColor: '#D4A25F', alignItems: 'center' },
-    btnSalvarTexto: { color: '#0F172A', fontSize: 16, fontWeight: 'bold', height: 50, lineHeight: 50, textAlignVertical: 'center' },
+
+    modalBotoes: {
+        flexDirection: isDesktopWeb ? 'row' : 'column', // Lado a lado no PC, Empilhado no Celular
+        marginTop: 15,
+        paddingBottom: 15,
+        gap: 10, // Adiciona espaçamento automático entre os botões (funciona em linha ou coluna)
+    },
+    btnCancelar: {
+        flex: 1,
+        padding: 15,
+        borderRadius: 8,
+        backgroundColor: '#334155',
+        alignItems: 'center',
+        // Removemos o marginRight porque o 'gap' acima já faz o espaçamento
+    },
+    btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+
+    btnSalvar: {
+        flex: 1,
+        padding: 15,
+        borderRadius: 8,
+        backgroundColor: '#D4A25F',
+        alignItems: 'center'
+    },
+    btnSalvarTexto: { color: '#0F172A', fontSize: 16, fontWeight: 'bold' },
 
     btnAssinarDepois: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#D4A25F', borderWidth: 1, borderColor: '#e79326' },
     btnAssinarDepoisTexto: { color: '#0F172A', fontSize: 12, fontWeight: '600' },
@@ -124,6 +144,21 @@ export const styles = StyleSheet.create({
     nestTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '600' },
     nestSubtitle: { color: '#94A3B8', fontSize: 13, marginTop: 2 },
 
+
+    modalTitle: { color: '#D4A25F', fontSize: 20, fontWeight: 'bold', marginLeft: 3, marginBottom: 15 },
+    modalLabel: { 
+        color: '#E2E8F0', // Cor clara para ficar bem visível no fundo escuro
+        fontSize: 14, 
+        fontWeight: '600', 
+        marginBottom: 5, 
+        marginTop: 10 
+    },
+    modalSubtitle: { 
+        color: '#94A3B8', 
+        fontSize: 12, 
+        marginBottom: 10 
+    },
+    
     // --- ESTILOS DO MENU SPEED DIAL (NOVO) ---
     menuFlutuanteContainer: {
         position: 'absolute',
@@ -168,7 +203,7 @@ export const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 3,
     },
-    
+
     miniFabIcon: {
         fontSize: 27,
         transform: [{ translateY: isDesktopWeb ? -2 : 0 }],

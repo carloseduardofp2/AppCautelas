@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, createElement } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar, Text, TouchableOpacity, ScrollView, Modal, View } from 'react-native';
+import { StatusBar, Text, TouchableOpacity, ScrollView, Modal, View, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { styles } from '../styles/MainStyles';
@@ -41,10 +41,15 @@ export default function MainContent() {
         novaObsEntrega, setNovaObsEntrega,
         novoMilSecOp, setNovoMilSecOp,
         dataSelecionada, mostrarCalendario, setMostrarCalendario,
-        dataInicio, dataFim, statusFiltro,
+        dataInicio, setDataInicio,
+        dataFim, setDataFim,
+        statusFiltro, setStatusFiltro,
+        modalPeriodoVisivel, setModalPeriodoVisivel,
+        avisoSemResultados, setAvisoSemResultados,
+        gerarRelatorioFiltrado,
         aoMudarData,
         solicitarExclusao,
-        solicitarExclusaoTodas  ,
+        solicitarExclusaoTodas,
         handleAssinatura,
         abrirMenuExportacao,
         cautelasFiltradas,
@@ -100,6 +105,15 @@ export default function MainContent() {
             {/* CORPO DA APLICAÇÃO - SCROLLVIEW ENVOLVENDO AS ABAS */}
             <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent}>
 
+                {/* 🔥 BANNER DE AVISO (Aparece se tentar gerar PDF vazio) */}
+                {avisoSemResultados !== '' && (
+                    <View style={{ backgroundColor: '#7F1D1D', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#991B1B' }}>
+                        <Text style={{ color: '#FFFFFF', textAlign: 'center', fontSize: 15, fontWeight: 'bold' }}>
+                            ⚠️ {avisoSemResultados}
+                        </Text>
+                    </View>
+                )}
+
                 {abaAtiva === 'Livro' && (
                     <LivroScreen
                         pesquisa={pesquisa}
@@ -131,8 +145,8 @@ export default function MainContent() {
                         itensExibicao={itensExibicao}
                         abrirOpcoesPasta={abrirOpcoesPasta}
                         abrirOpcoesItem={abrirOpcoesItem}
-                        
-                        
+
+
                         menuVisivel={menuVisivel}
                         itemMenu={itemMenu}
                         fecharMenu={fecharMenu}
@@ -267,17 +281,87 @@ export default function MainContent() {
                     </View>
                 </View>
             </Modal>
-            
+
             {/* COMPONENTE FOOTER */}
             <Footer abaAtiva={abaAtiva} setAbaAtiva={setAbaAtiva} />
 
-            {/* CALENDÁRIO NATIVO (SEM MODAL PARA EVITAR CONFLITOS) */}
-            {mostrarCalendario && (
+            {/* ========================================== */}
+            {/* MODAL DE SELEÇÃO DE PERÍODO (WEB E MOBILE) */}
+            {/* ========================================== */}
+            <Modal visible={modalPeriodoVisivel} transparent animationType="fade">
+                <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Filtrar Período</Text>
+
+                        {/* DATA INICIAL */}
+                        <Text style={[styles.label, { marginBottom: 8, color: '#D4A25F' }]}>Data Inicial:</Text>
+                        {Platform.OS === 'web' ? (
+                            createElement('input', {
+                                type: 'date',
+                                value: `${dataInicio.getFullYear()}-${String(dataInicio.getMonth() + 1).padStart(2, '0')}-${String(dataInicio.getDate()).padStart(2, '0')}`,
+                                onChange: (e) => {
+                                    const partes = e.target.value.split('-');
+                                    if (partes.length === 3) setDataInicio(new Date(partes[0], partes[1] - 1, partes[2]));
+                                },
+                                style: { backgroundColor: '#1E293B', color: '#FFF', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginBottom: 15, fontSize: 16, width: '100%', outline: 'none' }
+                            })
+                        ) : (
+                            <TouchableOpacity style={styles.input} onPress={() => { setStatusFiltro('inicio'); setMostrarCalendario(true); }}>
+                                <Text style={{ color: '#FFF', fontSize: 16 }}>{dataInicio.toLocaleDateString('pt-BR')}</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* DATA FINAL */}
+                        <Text style={[styles.label, { marginBottom: 8, color: '#D4A25F' }]}>Data Final:</Text>
+                        {Platform.OS === 'web' ? (
+                            createElement('input', {
+                                type: 'date',
+                                value: `${dataFim.getFullYear()}-${String(dataFim.getMonth() + 1).padStart(2, '0')}-${String(dataFim.getDate()).padStart(2, '0')}`,
+                                onChange: (e) => {
+                                    const partes = e.target.value.split('-');
+                                    if (partes.length === 3) setDataFim(new Date(partes[0], partes[1] - 1, partes[2]));
+                                },
+                                style: { backgroundColor: '#1E293B', color: '#FFF', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginBottom: 25, fontSize: 16, width: '100%', outline: 'none' }
+                            })
+                        ) : (
+                            <TouchableOpacity style={styles.input} onPress={() => { setStatusFiltro('fim'); setMostrarCalendario(true); }}>
+                                <Text style={{ color: '#FFF', fontSize: 16 }}>{dataFim.toLocaleDateString('pt-BR')}</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* BOTÕES */}
+                        <View style={styles.modalBotoes}>
+                            <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalPeriodoVisivel(false)}>
+                                <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.btnSalvar} onPress={() => {
+                                setModalPeriodoVisivel(false);
+                                gerarRelatorioFiltrado(dataInicio, dataFim);
+                            }}>
+                                <Text style={styles.btnSalvarTexto}>Gerar PDF</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* CALENDÁRIO NATIVO (ACIONADO APENAS NO CELULAR) */}
+            {mostrarCalendario && Platform.OS !== 'web' && (
                 <DateTimePicker
                     value={statusFiltro === 'inicio' ? dataInicio : dataFim}
                     mode="date"
                     display="default"
-                    onChange={aoMudarData}
+                    onChange={(event, dataEscolhida) => {
+                        if (event.type === 'dismissed') {
+                            setMostrarCalendario(false);
+                            return;
+                        }
+                        setMostrarCalendario(false);
+                        if (dataEscolhida) {
+                            if (statusFiltro === 'inicio') setDataInicio(dataEscolhida);
+                            else setDataFim(dataEscolhida);
+                        }
+                    }}
                 />
             )}
 

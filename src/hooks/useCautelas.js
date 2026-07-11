@@ -12,6 +12,7 @@ export function useCautelas() {
     const [listaCautelas, setListaCautelas] = useState([]);
     const [isExportando, setIsExportando] = useState(false);
     const [pesquisa, setPesquisa] = useState('');
+    const [avisoSemResultados, setAvisoSemResultados] = useState('');
 
     const [modalConfirmacaoCautela, setModalConfirmacaoCautela] = useState(false);
     const [dadosConfirmacaoCautela, setDadosConfirmacaoCautela] = useState({ titulo: '', msg: '', acao: null });
@@ -40,6 +41,8 @@ export function useCautelas() {
     const [dataInicio, setDataInicio] = useState(new Date());
     const [dataFim, setDataFim] = useState(new Date());
     const [statusFiltro, setStatusFiltro] = useState(null);
+
+    const [modalPeriodoVisivel, setModalPeriodoVisivel] = useState(false);
 
     const [modalExportacaoVisivel, setModalExportacaoVisivel] = useState(false);
 
@@ -212,12 +215,7 @@ export function useCautelas() {
 
     const abrirSelecaoPeriodo = () => {
         setModalExportacaoVisivel(false);
-        
-        // Pequeno atraso para a animação do modal fechar antes de abrir o calendário
-        setTimeout(() => {
-            setStatusFiltro('inicio');
-            setMostrarCalendario(true);
-        }, 300);
+        setModalPeriodoVisivel(true); // Abre o nosso novo visual
     };
 
     const gerarRelatorioFiltrado = (inicio, fim) => {
@@ -234,10 +232,13 @@ export function useCautelas() {
         });
 
         if (filtradas.length === 0) {
-            Alert.alert("Aviso", "Nenhuma cautela encontrada neste período.");
+            // Em vez do Alert, define a mensagem e faz ela sumir após 4 segundos
+            setAvisoSemResultados("Nenhuma cautela encontrada neste período.");
+            setTimeout(() => setAvisoSemResultados(''), 4000); 
         } else {
+            setAvisoSemResultados('');
             exportarParaPDF(filtradas, isExportando, setIsExportando);
-        }
+        }   
     };
 
     const cautelasFiltradas = listaCautelas.filter(cautela => {
@@ -270,7 +271,12 @@ export function useCautelas() {
         novaObsEntrega, setNovaObsEntrega,
         novoMilSecOp, setNovoMilSecOp,
         dataSelecionada, mostrarCalendario, setMostrarCalendario,
-        dataInicio, dataFim, statusFiltro,
+        dataInicio, setDataInicio,
+        dataFim, setDataFim,
+        statusFiltro, setStatusFiltro,
+        modalPeriodoVisivel, setModalPeriodoVisivel,
+        avisoSemResultados, setAvisoSemResultados,
+        gerarRelatorioFiltrado,
         aoMudarData,
         solicitarExclusao, solicitarExclusaoTodas,
         modalConfirmacaoCautela, setModalConfirmacaoCautela, 
