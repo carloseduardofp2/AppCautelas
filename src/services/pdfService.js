@@ -16,13 +16,15 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
         return ass;
       };
 
+      // 🔥 Fallback defensivo: como este PDF é um documento oficial, nunca deve
+      // exibir "undefined" caso algum campo venha vazio/ausente do Firestore.
       return `
           <tr>
-            <td>${c.militar} ${c.om ? `(${c.om})` : ''}</td>
-            <td>${c.material}</td>
-            <td>${c.quantidade}</td>
+            <td>${c.militar || '-'} ${c.om ? `(${c.om})` : ''}</td>
+            <td>${c.material || '-'}</td>
+            <td>${c.quantidade ?? '-'}</td>
             <td>${c.observacao || '-'}</td>
-            <td>${c.dataCautela}</td>
+            <td>${c.dataCautela || '-'}</td>
             <td>${c.milSecOpCautela || '-'}</td>
             <td style="text-align: center;">${renderImg(c.assinaturaCautela)}</td>
             <td>${c.dataEntrega || 'Pendente'}</td>
@@ -74,27 +76,42 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
 
     // --- SOLUÇÃO HÍBRIDA (WEB E CELULAR) ---
     if (Platform.OS === 'web') {
-        // Na Web: Cria um quadro invisível com o HTML puro para não vazar o visual do app
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-        
-        iframe.contentWindow.document.open();
-        iframe.contentWindow.document.write(html);
-        iframe.contentWindow.document.close();
-        
-        // Aguarda meio segundo para as assinaturas carregarem antes de gerar o PDF
-        setTimeout(() => {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
+        // 🔥 Try/catch próprio: antes, um erro aqui dentro pulava para o catch
+        // externo, cujo "finally" só reseta isExportando fora da Web — deixando
+        // o botão de exportar travado em "carregando" para sempre.
+        try {
+            // Na Web: Cria um quadro invisível com o HTML puro para não vazar o visual do app
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'absolute';
+            iframe.style.width = '0px';
+            iframe.style.height = '0px';
+            iframe.style.border = 'none';
+            document.body.appendChild(iframe);
+
+            iframe.contentWindow.document.open();
+            iframe.contentWindow.document.write(html);
+            iframe.contentWindow.document.close();
+
+            // Aguarda meio segundo para as assinaturas carregarem antes de gerar o PDF
             setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 1000);
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (printError) {
+                    console.error("Erro ao imprimir:", printError);
+                    Alert.alert("Erro", "Não foi possível abrir a janela de impressão.");
+                } finally {
+                    setTimeout(() => {
+                        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+                    }, 1000);
+                    setIsExportando(false);
+                }
+            }, 500);
+        } catch (webError) {
+            console.error("Erro na exportação (web):", webError);
+            Alert.alert("Erro", "Não foi possível gerar o PDF.");
             setIsExportando(false);
-        }, 500);
+        }
 
         return; // Encerra a função aqui para a Web
     }

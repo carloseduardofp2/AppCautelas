@@ -105,23 +105,25 @@ export const styles = StyleSheet.create({
 
     modalBotoes: {
         flexDirection: isDesktopWeb ? 'row' : 'column', // Lado a lado no PC, Empilhado no Celular
-        marginTop: 15,
+        marginTop: 10,
         paddingBottom: 15,
         gap: 10, // Adiciona espaçamento automático entre os botões (funciona em linha ou coluna)
     },
+    
     btnCancelar: {
         flex: 1,
-        padding: 15,
+        height: 55,               // Altura travada para ignorar o tamanho do emoji
+        justifyContent: 'center', // Centraliza o texto verticalmente
         borderRadius: 8,
         backgroundColor: '#334155',
         alignItems: 'center',
-        // Removemos o marginRight porque o 'gap' acima já faz o espaçamento
     },
     btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 
     btnSalvar: {
         flex: 1,
-        padding: 15,
+        height: 55,               // Altura travada igual ao de Cancelar
+        justifyContent: 'center', // Centraliza o texto verticalmente
         borderRadius: 8,
         backgroundColor: '#D4A25F',
         alignItems: 'center'
@@ -130,7 +132,7 @@ export const styles = StyleSheet.create({
 
     btnAssinarDepois: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#D4A25F', borderWidth: 1, borderColor: '#e79326' },
     btnAssinarDepoisTexto: { color: '#0F172A', fontSize: 12, fontWeight: '600' },
-
+    
     nestBreadcrumbBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E293B', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
     nestBreadcrumbHome: { color: '#E2E8F0', fontSize: 18 },
     nestBreadcrumbSeparator: { color: '#64748B', fontSize: 18, marginHorizontal: 8 },

@@ -127,7 +127,7 @@ export default function ModalNovaCautela({
                 </TouchableOpacity>
 
                 {/* BOTÃO NOVO: SALVAR PARA ASSINAR DEPOIS */}
-                <TouchableOpacity style={[styles.btnSalvar, { backgroundColor: '#475569', marginRight: 10 }]} onPress={() => {
+                <TouchableOpacity style={[styles.btnSalvar, { backgroundColor: '#475569' }]} onPress={() => {
                   if (novoMilitar === '' || novoMaterial === '' || novaQtd === '' || novoMilSecOpCautela === '') {
                     Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
                     return;

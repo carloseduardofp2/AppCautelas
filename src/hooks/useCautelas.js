@@ -5,6 +5,18 @@ import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, write
 import { removerAcentos } from '../utils/formatters';
 import { exportarParaPDF } from '../services/pdfService';
 
+// 🔥 Função única de conversão de data "dd/mm/aaaa" -> timestamp.
+// Antes essa mesma lógica estava duplicada (ordenação e filtro de período),
+// o que é um risco: uma correção futura em um lugar e não no outro geraria
+// bugs sutis de datas. Agora só existe uma versão para manter.
+function converterDataBR(dataString) {
+    if (!dataString) return 0;
+    const partes = dataString.split('/');
+    if (partes.length !== 3) return 0;
+    const dataObj = new Date(partes[2], partes[1] - 1, partes[0]);
+    return isNaN(dataObj.getTime()) ? 0 : dataObj.getTime();
+}
+
 // Hook responsável por tudo que envolve o Livro de Cautelas:
 // dados do Firestore, formulário de nova cautela, assinatura/devolução,
 // filtro de período e exportação em PDF.
@@ -56,15 +68,7 @@ export function useCautelas() {
             }));
 
             // Ordenação Cronológica (Mais recentes no topo)
-            dados.sort((a, b) => {
-                const converterDataParaNumero = (dataString) => {
-                    if (!dataString) return 0;
-                    const partes = dataString.split('/');
-                    if (partes.length !== 3) return 0;
-                    return new Date(partes[2], partes[1] - 1, partes[0]).getTime();
-                };
-                return converterDataParaNumero(b.dataCautela) - converterDataParaNumero(a.dataCautela);
-            });
+            dados.sort((a, b) => converterDataBR(b.dataCautela) - converterDataBR(a.dataCautela));
 
             setListaCautelas(dados);
         }, (error) => {
@@ -141,6 +145,14 @@ export function useCautelas() {
         const operacao = operacaoForcada || tipoOperacao;
 
         if (operacao === 'criar') {
+            // 🔥 Validação: impede salvar quantidade não-numérica (ex: usuário digitou
+            // "abc" ou colou texto no campo). Isso protege relatórios futuros que
+            // venham a somar/analisar essa coluna.
+            if (isNaN(Number(novaQtd)) || Number(novaQtd) <= 0) {
+                Alert.alert('Atenção', 'Quantidade inválida. Informe um número maior que zero.');
+                return;
+            }
+
             const novaCautela = {
                 militar: novoMilitar,
                 om: novaOm.trim() || 'Não informada',
@@ -223,12 +235,9 @@ export function useCautelas() {
         const fimObj = new Date(fim); fimObj.setHours(23, 59, 59, 999);
 
         const filtradas = listaCautelas.filter(c => {
-            if (!c.dataCautela) return false;
-            const partes = c.dataCautela.split('/');
-            if (partes.length !== 3) return false;
-            const dataCautelaObj = new Date(partes[2], partes[1] - 1, partes[0]);
-            if (isNaN(dataCautelaObj.getTime())) return false;
-            return dataCautelaObj >= inicioObj && dataCautelaObj <= fimObj;
+            const dataCautelaMs = converterDataBR(c.dataCautela);
+            if (dataCautelaMs === 0) return false;
+            return dataCautelaMs >= inicioObj.getTime() && dataCautelaMs <= fimObj.getTime();
         });
 
         if (filtradas.length === 0) {

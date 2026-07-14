@@ -61,6 +61,13 @@ export function useMateriais() {
             return;
         }
 
+        // 🔥 Validação: evita salvar quantidade não-numérica (NaN) no estoque,
+        // o que corromperia futuras somas/relatórios de itens.
+        if (isNaN(Number(matQtd)) || Number(matQtd) < 0) {
+            Alert.alert('Atenção', 'Quantidade inválida. Informe um número válido.');
+            return;
+        }
+
         try {
             await addDoc(collection(db, 'materiais'), {
                 localizacao: matLocal.trim() || 'Não informado',
@@ -142,6 +149,12 @@ export function useMateriais() {
     async function salvarEdicaoMaterial() {
         if (editMatNome.trim() === '' || editMatQtd.trim() === '') {
             Alert.alert('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
+            return;
+        }
+
+        // 🔥 Mesma validação do cadastro, aplicada também na edição.
+        if (isNaN(Number(editMatQtd)) || Number(editMatQtd) < 0) {
+            Alert.alert('Atenção', 'Quantidade inválida. Informe um número válido.');
             return;
         }
 
