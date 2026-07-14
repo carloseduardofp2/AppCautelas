@@ -23,7 +23,20 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "background_color": "#0F172A", 
+      "icons": [
+        {
+          "src": "assets/icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "assets/icon.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
     },
     "plugins": [
       "@react-native-community/datetimepicker"
