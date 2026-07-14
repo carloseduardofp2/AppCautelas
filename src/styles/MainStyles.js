@@ -117,6 +117,7 @@ export const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#334155',
         alignItems: 'center',
+        paddingVertical: 15,
     },
     btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 
@@ -126,11 +127,12 @@ export const styles = StyleSheet.create({
         justifyContent: 'center', // Centraliza o texto verticalmente
         borderRadius: 8,
         backgroundColor: '#D4A25F',
-        alignItems: 'center'
+        alignItems: 'center',
+        paddingVertical: 15,
     },
     btnSalvarTexto: { color: '#0F172A', fontSize: 16, fontWeight: 'bold' },
 
-    btnAssinarDepois: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#D4A25F', borderWidth: 1, borderColor: '#e79326' },
+    btnAssinarDepois: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#D4A25F', borderWidth: 1, borderColor: '#e79326', paddingVertical: 15, },
     btnAssinarDepoisTexto: { color: '#0F172A', fontSize: 12, fontWeight: '600' },
     
     nestBreadcrumbBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E293B', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
