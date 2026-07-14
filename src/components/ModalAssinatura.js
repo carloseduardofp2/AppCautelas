@@ -1,5 +1,5 @@
-import React, { useRef, createElement } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import React, { useRef, useState, createElement } from 'react';
+import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, Dimensions } from 'react-native';
 import SignatureScreen from 'react-native-signature-canvas';
 import { styles } from '../styles/MainStyles';
 
@@ -15,12 +15,22 @@ export default function ModalAssinatura({
 }) {
 
   // ============================================================
+  // TRAVA DE DUPLO CLIQUE (DOUBLE SUBMIT)
+  // ============================================================
+  const [isProcessando, setIsProcessando] = useState(false);
+
+  // ============================================================
   // LÓGICA DE ASSINATURA EXCLUSIVA PARA A WEB (CELULAR E PC)
   // ============================================================
   const canvasRef = useRef(null);
   const isDrawingWeb = useRef(false);
 
-  // Captura exatamente onde o dedo (ou mouse) está encostando
+  // Calcula a largura da tela dinamicamente para ocupar todo o espaço
+  const larguraTela = Dimensions.get('window').width;
+  // Subtrai as margens do modal para a prancheta caber perfeitamente
+  const canvasWidth = larguraTela > 600 ? 500 : larguraTela - 90; 
+  const canvasHeight = 220; // Aumentei a altura para dar mais conforto
+
   const getCoordenadas = (e, canvas) => {
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
@@ -33,7 +43,12 @@ export default function ModalAssinatura({
       clientY = e.clientY;
     }
 
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    // MULTIPLICA POR 2: Como a resolução interna do canvas será dobrada para 
+    // corrigir o visual pixelado, o mouse/dedo também precisa ser dobrado.
+    return { 
+        x: (clientX - rect.left) * 2, 
+        y: (clientY - rect.top) * 2 
+    };
   };
 
   const startDrawing = (e) => {
@@ -43,8 +58,8 @@ export default function ModalAssinatura({
     const ctx = canvas.getContext('2d');
     const { x, y } = getCoordenadas(e, canvas);
 
-    // Estilo da "Caneta"
-    ctx.lineWidth = 3;
+    // Ajusta a grossura da caneta (dobrada também) e o estilo para não serrilhar
+    ctx.lineWidth = 6; 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#000000';
@@ -78,7 +93,6 @@ export default function ModalAssinatura({
   const confirmarWeb = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    // Transforma o desenho do HTML5 em uma imagem Base64 exata para o seu PDF
     const base64 = canvas.toDataURL('image/png');
     handleAssinatura(base64);
   };
@@ -123,16 +137,29 @@ export default function ModalAssinatura({
                 </View>
               )}
 
-              {/* MÁGICA: Renderização Condicional (Web vs App) */}
               {Platform.OS === 'web' ? (
                 <View style={{ alignItems: 'center', marginBottom: 15 }}>
-                  <View style={{ backgroundColor: '#FFF', borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#CBD5E1', width: 300, height: 180 }}>
-                    {/* Cria a prancheta invisível que funciona no Chrome/Safari */}
+                  <View style={{ 
+                      backgroundColor: '#FFF', 
+                      borderRadius: 10, 
+                      overflow: 'hidden', 
+                      borderWidth: 1, 
+                      borderColor: '#CBD5E1', 
+                      width: canvasWidth, 
+                      height: canvasHeight 
+                  }}>
                     {createElement('canvas', {
                       ref: canvasRef,
-                      width: 300,
-                      height: 180,
-                      style: { touchAction: 'none', cursor: 'crosshair' },
+                      // RESOLUÇÃO INTERNA (O DOBRO) PARA ALTA DEFINIÇÃO (RETINA)
+                      width: canvasWidth * 2,
+                      height: canvasHeight * 2,
+                      // TAMANHO VISUAL (O CSS REDUZ PARA CABER NA TELA)
+                      style: { 
+                          touchAction: 'none', 
+                          cursor: 'crosshair',
+                          width: canvasWidth,
+                          height: canvasHeight
+                      },
                       onMouseDown: startDrawing,
                       onMouseMove: draw,
                       onMouseUp: stopDrawing,
@@ -147,7 +174,7 @@ export default function ModalAssinatura({
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View style={{ height: 180, backgroundColor: 'white', borderRadius: 10, marginBottom: 15, overflow: 'hidden' }}>
+                <View style={{ height: 220, backgroundColor: 'white', borderRadius: 10, marginBottom: 15, overflow: 'hidden' }}>
                   <SignatureScreen
                     ref={refAssinatura}
                     onOK={handleAssinatura}
@@ -161,14 +188,23 @@ export default function ModalAssinatura({
               )}
 
               <View style={styles.modalBotoes}>
-                <TouchableOpacity style={styles.btnCancelar} onPress={fechar}>
+                <TouchableOpacity 
+                    style={[styles.btnCancelar, { opacity: isProcessando ? 0.5 : 1 }]} 
+                    onPress={fechar}
+                    disabled={isProcessando}
+                >
                   <Text style={styles.btnCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
 
+                {/* BOTÃO COM A TRAVA ANTI-CLIQUE DUPLO */}
                 <TouchableOpacity 
-                  style={styles.btnSalvar} 
+                  style={[styles.btnSalvar, { opacity: isProcessando ? 0.6 : 1 }]} 
+                  disabled={isProcessando}
                   onPress={() => {
-                    // Direciona o botão Confirmar para a prancheta correta
+                    if (isProcessando) return; // Segurança extra
+                    
+                    setIsProcessando(true); // Bloqueia imediatamente o botão
+                    
                     if (Platform.OS === 'web') {
                       confirmarWeb();
                     } else {
@@ -176,7 +212,9 @@ export default function ModalAssinatura({
                     }
                   }}
                 >
-                  <Text style={styles.btnSalvarTexto}>Confirmar</Text>
+                  <Text style={styles.btnSalvarTexto}>
+                      {isProcessando ? 'Salvando...' : 'Confirmar'}
+                  </Text>
                 </TouchableOpacity>
               </View>
               
