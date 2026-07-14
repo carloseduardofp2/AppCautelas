@@ -93,8 +93,8 @@ export default function ModalNovaCautela({
                 />
 
                 <TouchableOpacity
-                  style={[styles.input, { flex: 1, justifyContent: 'center' }]}
-                  onPress={() => setMostrarCalendario(true)}
+                  style={[styles.input, { justifyContent: 'center', paddingHorizontal: 30 }]}
+                    onPress={() => setMostrarCalendario(true)}
                 >
                   <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
                     {dataSelecionada.toLocaleDateString('pt-BR')}

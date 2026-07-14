@@ -117,17 +117,20 @@ export const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#334155',
         alignItems: 'center',
+        paddingVertical: 15,
     },
     btnCancelarTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 
-    btnSalvar: {
+    btnCancelar: {
         flex: 1,
-        height: 55,               // Altura travada igual ao de Cancelar
-        justifyContent: 'center', // Centraliza o texto verticalmente
+        minHeight: 55,            // minHeight garante que ele nunca fique esmagado
+        justifyContent: 'center',
         borderRadius: 8,
-        backgroundColor: '#D4A25F',
-        alignItems: 'center'
+        backgroundColor: '#334155',
+        alignItems: 'center',
+        paddingVertical: 15,      // Força a margem interna para engordar o botão
     },
+    
     btnSalvarTexto: { color: '#0F172A', fontSize: 16, fontWeight: 'bold' },
 
     btnAssinarDepois: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#D4A25F', borderWidth: 1, borderColor: '#e79326' },
