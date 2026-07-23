@@ -7,14 +7,25 @@ export default function ModalNovaCautela({
   fechar,
   novoMilitar, setNovoMilitar,
   novaOm, setNovaOm,
-  novoMaterial, setNovoMaterial,
-  novaQtd, setNovaQtd,
+  materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
   novaObs, setNovaObs,
   novoMilSecOpCautela, setNovoMilSecOpCautela,
   dataSelecionada, mostrarCalendario,
   setMostrarCalendario, aoMudarData,
   avancarParaAssinatura
 }) {
+  const validarCampos = () => {
+    if (novoMilitar === '' || novoMilSecOpCautela === '') {
+      Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
+      return false;
+    }
+    if (!materiaisCautela.some(m => m.nome.trim() !== '' && m.quantidade.trim() !== '')) {
+      Alert.alert('Atenção', 'Adicione ao menos um material com quantidade.');
+      return false;
+    }
+    return true;
+  };
+
   return (
     <Modal
       animationType="slide"
@@ -74,33 +85,44 @@ export default function ModalNovaCautela({
                 ))}
               </View>
 
-              <TextInput
-                style={styles.input}
-                placeholder="Material"
-                placeholderTextColor="#64748B"
-                value={novoMaterial}
-                onChangeText={setNovoMaterial}
-              />
+              {/* 🔥 Lista de materiais: agora é possível cautelar mais de um item de uma vez */}
+              {materiaisCautela.map((item, index) => (
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <TextInput
+                    style={[styles.input, { flex: 2, marginRight: 8, marginBottom: 0 }]}
+                    placeholder="Material"
+                    placeholderTextColor="#64748B"
+                    value={item.nome}
+                    onChangeText={(v) => atualizarLinhaMaterial(index, 'nome', v)}
+                  />
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginRight: 8, marginBottom: 0 }]}
+                    placeholder="Qtd"
+                    placeholderTextColor="#64748B"
+                    keyboardType="numeric"
+                    value={item.quantidade}
+                    onChangeText={(v) => atualizarLinhaMaterial(index, 'quantidade', v)}
+                  />
+                  {materiaisCautela.length > 1 && (
+                    <TouchableOpacity onPress={() => removerLinhaMaterial(index)} style={{ padding: 6 }}>
+                      <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700' }}>✕</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
 
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={[styles.input, { flex: 1, marginRight: 10 }]}
-                  placeholder="Quantidade"
-                  placeholderTextColor="#64748B"
-                  keyboardType="numeric"
-                  value={novaQtd}
-                  onChangeText={setNovaQtd}
-                />
+              <TouchableOpacity onPress={adicionarLinhaMaterial} style={{ marginBottom: 15 }}>
+                <Text style={{ color: '#38BDF8', fontWeight: '600' }}>+ Adicionar material</Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.input, { justifyContent: 'center', paddingHorizontal: 30 }]}
-                    onPress={() => setMostrarCalendario(true)}
-                >
-                  <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
-                    {dataSelecionada.toLocaleDateString('pt-BR')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.input, { justifyContent: 'center' }]}
+                onPress={() => setMostrarCalendario(true)}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
+                  📅 {dataSelecionada.toLocaleDateString('pt-BR')}
+                </Text>
+              </TouchableOpacity>
 
               {mostrarCalendario && (
                 <DateTimePicker
@@ -128,10 +150,7 @@ export default function ModalNovaCautela({
 
                 {/* BOTÃO NOVO: SALVAR PARA ASSINAR DEPOIS */}
                 <TouchableOpacity style={[styles.btnSalvar, { backgroundColor: '#475569' }]} onPress={() => {
-                  if (novoMilitar === '' || novoMaterial === '' || novaQtd === '' || novoMilSecOpCautela === '') {
-                    Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
-                    return;
-                  }
+                  if (!validarCampos()) return;
                   // 🔥 Lógica nova: Avança direto para salvar no banco com assinatura vazia
                   avancarParaAssinatura(true);
                 }}>
@@ -139,10 +158,7 @@ export default function ModalNovaCautela({
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.btnSalvar} onPress={() => {
-                  if (novoMilitar === '' || novoMaterial === '' || novaQtd === '' || novoMilSecOpCautela === '') {
-                    Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
-                    return;
-                  }
+                  if (!validarCampos()) return;
                   avancarParaAssinatura(false);
                 }}>
                   <Text style={styles.btnSalvarTexto}>✍️ Assinar Agora</Text>

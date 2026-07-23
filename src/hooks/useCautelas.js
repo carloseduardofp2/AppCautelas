@@ -33,10 +33,20 @@ export function useCautelas() {
     const [modalVisivel, setModalVisivel] = useState(false);
     const [novoMilitar, setNovoMilitar] = useState('');
     const [novaOm, setNovaOm] = useState('');
-    const [novoMaterial, setNovoMaterial] = useState('');
-    const [novaQtd, setNovaQtd] = useState('');
+    // 🔥 Agora suporta múltiplos materiais numa mesma cautela (antes era 1 campo só).
+    const [materiaisCautela, setMateriaisCautela] = useState([{ nome: '', quantidade: '' }]);
     const [novaObs, setNovaObs] = useState('');
     const [novoMilSecOpCautela, setNovoMilSecOpCautela] = useState('');
+
+    const adicionarLinhaMaterial = () => {
+        setMateriaisCautela(prev => [...prev, { nome: '', quantidade: '' }]);
+    };
+    const removerLinhaMaterial = (index) => {
+        setMateriaisCautela(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== index));
+    };
+    const atualizarLinhaMaterial = (index, campo, valor) => {
+        setMateriaisCautela(prev => prev.map((item, i) => i === index ? { ...item, [campo]: valor } : item));
+    };
 
     // --- ASSINATURA / DEVOLUÇÃO ---
     const [tipoOperacao, setTipoOperacao] = useState('');
@@ -145,19 +155,27 @@ export function useCautelas() {
         const operacao = operacaoForcada || tipoOperacao;
 
         if (operacao === 'criar') {
-            // 🔥 Validação: impede salvar quantidade não-numérica (ex: usuário digitou
-            // "abc" ou colou texto no campo). Isso protege relatórios futuros que
-            // venham a somar/analisar essa coluna.
-            if (isNaN(Number(novaQtd)) || Number(novaQtd) <= 0) {
-                Alert.alert('Atenção', 'Quantidade inválida. Informe um número maior que zero.');
+            // 🔥 Valida cada linha de material: nome preenchido e quantidade numérica > 0.
+            const materiaisValidos = materiaisCautela.filter(m => m.nome.trim() !== '');
+            if (materiaisValidos.length === 0) {
+                Alert.alert('Atenção', 'Adicione ao menos um material.');
                 return;
+            }
+            for (const m of materiaisValidos) {
+                if (isNaN(Number(m.quantidade)) || Number(m.quantidade) <= 0) {
+                    Alert.alert('Atenção', `Quantidade inválida para "${m.nome}". Informe um número maior que zero.`);
+                    return;
+                }
             }
 
             const novaCautela = {
                 militar: novoMilitar,
                 om: novaOm.trim() || 'Não informada',
-                material: novoMaterial,
-                quantidade: novaQtd,
+                // materiais: fonte de verdade (lista); material/quantidade: strings
+                // "resumo" mantidas por compatibilidade com telas antigas e busca.
+                materiais: materiaisValidos,
+                material: materiaisValidos.map(m => m.nome).join(', '),
+                quantidade: materiaisValidos.map(m => m.quantidade).join(', '),
                 observacao: novaObs,
                 dataCautela: dataSelecionada.toLocaleDateString('pt-BR'),
                 milSecOpCautela: novoMilSecOpCautela,
@@ -171,7 +189,7 @@ export function useCautelas() {
             try {
                 await addDoc(collection(db, 'cautelas'), novaCautela);
                 setModalAssinatura(false);
-                setNovoMilitar(''); setNovaOm(''); setNovoMaterial(''); setNovaQtd(''); setNovaObs(''); setNovoMilSecOpCautela('');
+                setNovoMilitar(''); setNovaOm(''); setMateriaisCautela([{ nome: '', quantidade: '' }]); setNovaObs(''); setNovoMilSecOpCautela('');
                 Alert.alert("Sucesso", "Cautela registrada no sistema!");
             } catch (error) {
                 console.error("Erro ao salvar cautela: ", error);
@@ -268,8 +286,7 @@ export function useCautelas() {
         modalVisivel, setModalVisivel,
         novoMilitar, setNovoMilitar,
         novaOm, setNovaOm,
-        novoMaterial, setNovoMaterial,
-        novaQtd, setNovaQtd,
+        materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
         novaObs, setNovaObs,
         novoMilSecOpCautela, setNovoMilSecOpCautela,
         tipoOperacao, setTipoOperacao,

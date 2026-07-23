@@ -60,11 +60,17 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
 
       // 🔥 Fallback defensivo: como este PDF é um documento oficial, nunca deve
       // exibir "undefined" caso algum campo venha vazio/ausente do Firestore.
+      // Suporta múltiplos materiais numa mesma cautela: cada item aparece como
+      // "Nome (Qtd)" dentro da mesma célula/linha, sem gerar linhas extras no PDF.
+      // Cautelas antigas (sem o array "materiais") continuam funcionando via fallback.
+      const listaMateriais = Array.isArray(c.materiais) && c.materiais.length > 0
+        ? c.materiais.map(m => `${m.nome || '-'} (${m.quantidade ?? '-'})`).join('<br>')
+        : `${c.material || '-'}${c.quantidade ? ` (${c.quantidade})` : ''}`;
+
       return `
           <tr>
             <td>${c.militar || '-'} ${c.om ? `(${c.om})` : ''}</td>
-            <td>${c.material || '-'}</td>
-            <td>${c.quantidade ?? '-'}</td>
+            <td>${listaMateriais}</td>
             <td>${c.observacao || '-'}</td>
             <td>${c.dataCautela || '-'}</td>
             <td>${c.milSecOpCautela || '-'}</td>
@@ -96,8 +102,7 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
               <thead>
                 <tr>
                   <th>Militar (OM)</th>
-                  <th>Material</th>
-                  <th>Qtd</th>
+                  <th>Material(is) / Qtd</th>
                   <th>Obs Cautela</th>
                   <th>Retirada</th>
                   <th>Mil Sec Op (Saída)</th>

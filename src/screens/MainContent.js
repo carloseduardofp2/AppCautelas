@@ -29,8 +29,7 @@ export default function MainContent() {
         modalVisivel, setModalVisivel,
         novoMilitar, setNovoMilitar,
         novaOm, setNovaOm,
-        novoMaterial, setNovoMaterial,
-        novaQtd, setNovaQtd,
+        materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
         novaObs, setNovaObs,
         novoMilSecOpCautela, setNovoMilSecOpCautela,
         tipoOperacao, setTipoOperacao,
@@ -172,8 +171,10 @@ export default function MainContent() {
                     fechar={() => setModalVisivel(false)}
                     novoMilitar={novoMilitar} setNovoMilitar={setNovoMilitar}
                     novaOm={novaOm} setNovaOm={setNovaOm}
-                    novoMaterial={novoMaterial} setNovoMaterial={setNovoMaterial}
-                    novaQtd={novaQtd} setNovaQtd={setNovaQtd}
+                    materiaisCautela={materiaisCautela}
+                    adicionarLinhaMaterial={adicionarLinhaMaterial}
+                    removerLinhaMaterial={removerLinhaMaterial}
+                    atualizarLinhaMaterial={atualizarLinhaMaterial}
                     novaObs={novaObs} setNovaObs={setNovaObs}
                     novoMilSecOpCautela={novoMilSecOpCautela} setNovoMilSecOpCautela={setNovoMilSecOpCautela}
                     dataSelecionada={dataSelecionada} mostrarCalendario={mostrarCalendario}
