@@ -123,34 +123,37 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
 
     // --- SOLUÇÃO HÍBRIDA (WEB E CELULAR) ---
     if (Platform.OS === 'web') {
-        // 🔥 Try/catch próprio: antes, um erro aqui dentro pulava para o catch
-        // externo, cujo "finally" só reseta isExportando fora da Web — deixando
-        // o botão de exportar travado em "carregando" para sempre.
+        // 🔥 Antes usava uma <iframe> invisível. Em navegadores desktop isso
+        // isola bem o print(), mas em navegadores mobile (Chrome Android,
+        // Safari iOS) o print() de uma iframe escondida não é respeitado:
+        // o navegador ignora a iframe e imprime a tela visível do app inteira
+        // (foi por isso que o PDF saiu "como um print da tela" no celular).
+        // Abrindo uma aba/janela nova de verdade com o HTML, o print() do
+        // próprio navegador passa a funcionar de forma confiável nos dois casos.
         try {
-            // Na Web: Cria um quadro invisível com o HTML puro para não vazar o visual do app
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'absolute';
-            iframe.style.width = '0px';
-            iframe.style.height = '0px';
-            iframe.style.border = 'none';
-            document.body.appendChild(iframe);
+            const janelaImpressao = window.open('', '_blank');
 
-            iframe.contentWindow.document.open();
-            iframe.contentWindow.document.write(html);
-            iframe.contentWindow.document.close();
+            if (!janelaImpressao) {
+                Alert.alert("Erro", "Não foi possível abrir a janela de impressão. Verifique se o bloqueador de pop-ups está desativado.");
+                setIsExportando(false);
+                return;
+            }
 
-            // Aguarda meio segundo para as assinaturas carregarem antes de gerar o PDF
+            janelaImpressao.document.open();
+            janelaImpressao.document.write(html);
+            janelaImpressao.document.close();
+
+            // Aguarda meio segundo para as assinaturas (imagens) carregarem antes de imprimir
             setTimeout(() => {
                 try {
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
+                    janelaImpressao.focus();
+                    janelaImpressao.print();
+                    // Fecha a aba sozinha depois de imprimir/cancelar (suportado na maioria dos navegadores desktop)
+                    janelaImpressao.onafterprint = () => janelaImpressao.close();
                 } catch (printError) {
                     console.error("Erro ao imprimir:", printError);
                     Alert.alert("Erro", "Não foi possível abrir a janela de impressão.");
                 } finally {
-                    setTimeout(() => {
-                        if (document.body.contains(iframe)) document.body.removeChild(iframe);
-                    }, 1000);
                     setIsExportando(false);
                 }
             }, 500);
