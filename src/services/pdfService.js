@@ -143,12 +143,19 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
             janelaImpressao.document.write(html);
             janelaImpressao.document.close();
 
-            // Aguarda meio segundo para as assinaturas (imagens) carregarem antes de imprimir
-            setTimeout(() => {
+            // 🔥 Antes esperava 500ms fixos antes de imprimir. Com várias
+            // cautelas assinadas (imagens em base64), decodificar tudo pode
+            // levar mais que isso, e o navegador trava em "Preparando
+            // visualização". Agora espera o carregamento real da aba (evento
+            // "load"), com um limite de segurança de 4s caso o evento não
+            // dispare por algum motivo — e um "trava" para nunca imprimir 2x.
+            let jaImprimiu = false;
+            const dispararImpressao = () => {
+                if (jaImprimiu) return;
+                jaImprimiu = true;
                 try {
                     janelaImpressao.focus();
                     janelaImpressao.print();
-                    // Fecha a aba sozinha depois de imprimir/cancelar (suportado na maioria dos navegadores desktop)
                     janelaImpressao.onafterprint = () => janelaImpressao.close();
                 } catch (printError) {
                     console.error("Erro ao imprimir:", printError);
@@ -156,7 +163,10 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
                 } finally {
                     setIsExportando(false);
                 }
-            }, 500);
+            };
+
+            janelaImpressao.onload = () => setTimeout(dispararImpressao, 300);
+            setTimeout(dispararImpressao, 4000); // segurança, caso "load" não dispare
         } catch (webError) {
             console.error("Erro na exportação (web):", webError);
             Alert.alert("Erro", "Não foi possível gerar o PDF.");
