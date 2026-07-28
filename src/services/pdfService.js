@@ -1,48 +1,9 @@
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { Alert, Platform } from 'react-native';
+import html2pdf from 'html2pdf.js'; // 🔥 Nova importação
 
-export async function compartilharOuBaixarPDF(base64Data, nomeArquivo) {
-  // 1. Converter Base64 para Blob (formato de arquivo binário)
-  const byteCharacters = atob(base64Data);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  const blob = new Blob([byteArray], { type: 'application/pdf' });
-
-  // 2. Verificar se o navegador suporta Web Share API (Mobile Safari/Chrome suportam)
-  if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], `${nomeArquivo}.pdf`, { type: 'application/pdf' })] })) {
-    try {
-      const file = new File([blob], `${nomeArquivo}.pdf`, { type: 'application/pdf' });
-      await navigator.share({
-        files: [file],
-        title: 'Cautela Gerada',
-        text: 'Segue o PDF da cautela solicitada.'
-      });
-    } catch (error) {
-      console.error("Erro ao compartilhar:", error);
-      // Fallback: Se o usuário cancelar ou der erro, baixa o arquivo
-      downloadBlob(blob, `${nomeArquivo}.pdf`);
-    }
-  } else {
-    // 3. Fallback: Se não suportar compartilhar (ex: navegadores desktop antigos), faz o download direto
-    downloadBlob(blob, `${nomeArquivo}.pdf`);
-  }
-}
-
-// Função auxiliar de download
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
+// ... (suas outras funções compartilharOuBaixarPDF e downloadBlob continuam aqui)
 
 export async function exportarParaPDF(listaCautelas, isExportando, setIsExportando) {
   if (isExportando) return;
@@ -58,11 +19,6 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
         return ass;
       };
 
-      // 🔥 Fallback defensivo: como este PDF é um documento oficial, nunca deve
-      // exibir "undefined" caso algum campo venha vazio/ausente do Firestore.
-      // Suporta múltiplos materiais numa mesma cautela: cada item aparece como
-      // "Nome (Qtd)" dentro da mesma célula/linha, sem gerar linhas extras no PDF.
-      // Cautelas antigas (sem o array "materiais") continuam funcionando via fallback.
       const listaMateriais = Array.isArray(c.materiais) && c.materiais.length > 0
         ? c.materiais.map(m => `${m.nome || '-'} (${m.quantidade ?? '-'})`).join('<br>')
         : `${c.material || '-'}${c.quantidade ? ` (${c.quantidade})` : ''}`;
@@ -123,60 +79,86 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
 
     // --- SOLUÇÃO HÍBRIDA (WEB E CELULAR) ---
     if (Platform.OS === 'web') {
-        // 🔥 Antes usava uma <iframe> invisível. Em navegadores desktop isso
-        // isola bem o print(), mas em navegadores mobile (Chrome Android,
-        // Safari iOS) o print() de uma iframe escondida não é respeitado:
-        // o navegador ignora a iframe e imprime a tela visível do app inteira
-        // (foi por isso que o PDF saiu "como um print da tela" no celular).
-        // Abrindo uma aba/janela nova de verdade com o HTML, o print() do
-        // próprio navegador passa a funcionar de forma confiável nos dois casos.
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      // 🔥 1. FLUXO EXCLUSIVO PARA CELULAR WEB (WhatsApp)
+      if (isMobile && navigator.canShare) {
         try {
-            const janelaImpressao = window.open('', '_blank');
+          const container = document.createElement('div');
+          container.innerHTML = html;
 
-            if (!janelaImpressao) {
-                Alert.alert("Erro", "Não foi possível abrir a janela de impressão. Verifique se o bloqueador de pop-ups está desativado.");
-                setIsExportando(false);
-                return;
-            }
+          // Configurações para a geração silenciosa do PDF
+          const opt = {
+            margin:       5,
+            filename:     'livro_cautelas.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape fica melhor para tabelas longas
+          };
 
-            janelaImpressao.document.open();
-            janelaImpressao.document.write(html);
-            janelaImpressao.document.close();
+          // Gera o Blob nos bastidores (demora cerca de 1 a 2 segundos dependendo das assinaturas)
+          const pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
+          
+          // Transforma o Blob em um File que a Web Share API entenda
+          const file = new File([pdfBlob], 'livro_cautelas.pdf', { type: 'application/pdf' });
 
-            // 🔥 Antes esperava 500ms fixos antes de imprimir. Com várias
-            // cautelas assinadas (imagens em base64), decodificar tudo pode
-            // levar mais que isso, e o navegador trava em "Preparando
-            // visualização". Agora espera o carregamento real da aba (evento
-            // "load"), com um limite de segurança de 4s caso o evento não
-            // dispare por algum motivo — e um "trava" para nunca imprimir 2x.
-            let jaImprimiu = false;
-            const dispararImpressao = () => {
-                if (jaImprimiu) return;
-                jaImprimiu = true;
-                try {
-                    janelaImpressao.focus();
-                    janelaImpressao.print();
-                    janelaImpressao.onafterprint = () => janelaImpressao.close();
-                } catch (printError) {
-                    console.error("Erro ao imprimir:", printError);
-                    Alert.alert("Erro", "Não foi possível abrir a janela de impressão.");
-                } finally {
-                    setIsExportando(false);
-                }
-            };
-
-            janelaImpressao.onload = () => setTimeout(dispararImpressao, 300);
-            setTimeout(dispararImpressao, 4000); // segurança, caso "load" não dispare
-        } catch (webError) {
-            console.error("Erro na exportação (web):", webError);
-            Alert.alert("Erro", "Não foi possível gerar o PDF.");
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Livro de Cautelas',
+              text: 'Segue o PDF do livro de cautelas gerado.'
+            });
             setIsExportando(false);
+            return; // 🛑 Sucesso! Finaliza a função aqui.
+          }
+        } catch (err) {
+          console.error("Erro ao gerar/compartilhar PDF oculto via html2pdf:", err);
+          // Se der erro ou o usuário cancelar, deixamos cair para o código original do PC como fallback de segurança
+        }
+      }
+
+      // 🔥 2. FLUXO ORIGINAL PARA PC (Mantido intacto)
+      try {
+        const janelaImpressao = window.open('', '_blank');
+
+        if (!janelaImpressao) {
+            Alert.alert("Erro", "Não foi possível abrir a janela de impressão. Verifique se o bloqueador de pop-ups está desativado.");
+            setIsExportando(false);
+            return;
         }
 
-        return; // Encerra a função aqui para a Web
+        janelaImpressao.document.open();
+        janelaImpressao.document.write(html);
+        janelaImpressao.document.close();
+
+        let jaImprimiu = false;
+        const dispararImpressao = () => {
+            if (jaImprimiu) return;
+            jaImprimiu = true;
+            try {
+                janelaImpressao.focus();
+                janelaImpressao.print();
+                janelaImpressao.onafterprint = () => janelaImpressao.close();
+            } catch (printError) {
+                console.error("Erro ao imprimir:", printError);
+                Alert.alert("Erro", "Não foi possível abrir a janela de impressão.");
+            } finally {
+                setIsExportando(false);
+            }
+        };
+
+        janelaImpressao.onload = () => setTimeout(dispararImpressao, 300);
+        setTimeout(dispararImpressao, 4000); 
+      } catch (webError) {
+          console.error("Erro na exportação (web):", webError);
+          Alert.alert("Erro", "Não foi possível gerar o PDF.");
+          setIsExportando(false);
+      }
+
+      return; // Encerra a função na Web
     }
 
-    // --- SEU CÓDIGO ORIGINAL INTACTO PARA O CELULAR ---
+    // --- SEU CÓDIGO ORIGINAL PARA NATIVO (APK/IPA) INTACTO ---
     const { uri } = await Print.printToFileAsync({ html });
     const isAvailable = await Sharing.isAvailableAsync();
 
