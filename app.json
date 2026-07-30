@@ -21,6 +21,7 @@
       }
     },
     "web": {
+      "lang": "pt-BR",
       "favicon": "./assets/favicon.png",
       "background_color": "#0F172A"
     },

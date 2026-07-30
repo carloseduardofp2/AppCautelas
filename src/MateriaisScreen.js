@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, StyleSheet } from 'react-native';
+import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
-export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem, menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
+export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem, menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoExcluirMenu,
   confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao, modalEditarPastaVisivel, setModalEditarPastaVisivel, nomeEdicaoPasta, setNomeEdicaoPasta, salvarEdicaoPasta, modoSelecao, setModoSelecao, itensSelecionados, setItensSelecionados,
   modalMoverVisivel, setModalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
-  pastaSendoMovida, ativarModoSelecao, toggleSelecao, confirmarMovimentacao, cancelarMovimentacao, todasAsPastas }) {
+  ativarModoSelecao, toggleSelecao, confirmarMovimentacao, todasAsPastas }) {
   return (
     <View style={styles.secaoContainer}>
       <Text style={styles.tituloSecao}>RESERVA DE MATERIAIS</Text>
@@ -18,7 +18,7 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
         onChangeText={setPesquisaMateriais}
       />
 
-      {pesquisaMateriais.trim() === '' && (
+      {pesquisaMateriais === '' && (
         <View style={styles.nestBreadcrumbBar}>
           <TouchableOpacity onPress={() => setCaminhoMateriais([])} style={{ padding: 5 }}>
             <Text style={styles.nestBreadcrumbHome}>🏠</Text>
@@ -34,9 +34,9 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
         </View>
       )}
 
-      {pastasExibicao.map((pasta) => (
+      {pastasExibicao.map((pasta, index) => (
         <TouchableOpacity
-          key={pasta.id}
+          key={`pasta-${index}`}
           style={styles.nestItem}
           onPress={() => { setPesquisaMateriais(''); setCaminhoMateriais(pasta.path) }}
         >
@@ -50,17 +50,11 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
           </View>
           <View style={styles.nestItemBody}>
             <Text style={styles.nestTitle}>{pasta.nome}</Text>
-            {pesquisaMateriais.trim() !== '' && pasta.caminhoCompleto !== pasta.nome && (
-              <Text style={styles.nestSubtitle}>{pasta.caminhoCompleto}</Text>
-            )}
           </View>
 
           <TouchableOpacity
             style={styles.nestMenuBtn}
-            onPress={(event) => {
-              event.stopPropagation?.();
-              abrirOpcoesPasta(pasta);
-            }}
+            onPress={() => abrirOpcoesPasta(pasta)}
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
             <Text style={styles.nestMenuText}>⋮</Text>
@@ -90,19 +84,13 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
             <View style={styles.nestItemBody}>
               <Text style={styles.nestTitle}>{item.item}</Text>
               <Text style={styles.nestSubtitle}>Qtd: {item.quantidade} | {item.observacao || 'Sem obs'}</Text>
-              {pesquisaMateriais.trim() !== '' && item.caminhoExibicao && (
-                <Text style={styles.nestSubtitle}>📍 {item.caminhoExibicao}</Text>
-              )}
             </View>
 
             {/* Esconde o menu de 3 pontinhos se estiver no modo de seleção */}
             {!modoSelecao && (
               <TouchableOpacity
                 style={styles.nestMenuBtn}
-                onPress={(event) => {
-                  event.stopPropagation?.();
-                  abrirOpcoesItem(item);
-                }}
+                onPress={() => abrirOpcoesItem(item)}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
               >
                 <Text style={styles.nestMenuText}>⋮</Text>
@@ -122,14 +110,8 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
       {/* ========================================== */}
       {/* 1. MODAL CUSTOMIZADO: MENU DE OPÇÕES (BOTTOM SHEET) */}
       {/* ========================================== */}
-      <Modal visible={menuVisivel} transparent animationType="slide" onRequestClose={fecharMenu}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={fecharMenu}
-            accessibilityLabel="Fechar menu"
-          />
+      <Modal visible={menuVisivel} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={fecharMenu}>
           <View style={styles.bottomSheetContent}>
             <Text style={styles.bottomSheetTitle}>
               {itemMenu?.tipo === 'pasta' ? `Pasta: ${itemMenu.dados.nome}` : itemMenu?.dados.item}
@@ -138,13 +120,6 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
             <TouchableOpacity style={styles.bottomSheetButton} onPress={acaoEditarMenu}>
               <Text style={styles.bottomSheetIcon}>✏️</Text>
               <Text style={styles.bottomSheetButtonText}>Editar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.bottomSheetButton} onPress={acaoMoverMenu}>
-              <Text style={styles.bottomSheetIcon}>📦</Text>
-              <Text style={styles.bottomSheetButtonText}>
-                {itemMenu?.tipo === 'pasta' ? 'Mover prateleira' : 'Mover material'}
-              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.bottomSheetButton} onPress={acaoExcluirMenu}>
@@ -156,7 +131,7 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
               <Text style={styles.btnCancelarTexto}>Cancelar</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* ========================================== */}
@@ -245,20 +220,10 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
       {/* ========================================== */}
       {/* MODAL PARA ESCOLHER A PASTA DE DESTINO       */}
       {/* ========================================== */}
-      <Modal visible={modalMoverVisivel} transparent animationType="slide" onRequestClose={cancelarMovimentacao}>
+      <Modal visible={modalMoverVisivel} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.bottomSheetContent, { maxHeight: '80%' }]}>
-            <Text style={styles.bottomSheetTitle}>
-              {pastaSendoMovida
-                ? `Mover "${pastaSendoMovida.nome}" para onde?`
-                : 'Mover material(is) para onde?'}
-            </Text>
-
-            {pastaSendoMovida && (
-              <Text style={{ color: '#94A3B8', textAlign: 'center', marginBottom: 12 }}>
-                As prateleiras internas e todos os materiais serão movidos juntos.
-              </Text>
-            )}
+            <Text style={styles.bottomSheetTitle}>Mover para onde?</Text>
 
             <ScrollView style={{ width: '100%', marginBottom: 15 }}>
               {todasAsPastas.map(pasta => {
@@ -293,7 +258,7 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
             </ScrollView>
 
             <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between' }}>
-              <TouchableOpacity style={[styles.btnCancelar, { flex: 1, marginRight: 10 }]} onPress={cancelarMovimentacao}>
+              <TouchableOpacity style={[styles.btnCancelar, { flex: 1, marginRight: 10 }]} onPress={() => setModalMoverVisivel(false)}>
                 <Text style={styles.btnCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.btnSalvar, { flex: 1 }]} onPress={confirmarMovimentacao}>

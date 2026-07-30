@@ -84,15 +84,14 @@ export default function MainContent() {
         salvarNovaPrateleira,
         pastasExibicao, itensExibicao,
         abrirOpcoesPasta, abrirOpcoesItem,
-        menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
+        menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoExcluirMenu,
         confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao,
         modalEditarPastaVisivel, setModalEditarPastaVisivel,
         nomeEdicaoPasta, setNomeEdicaoPasta,
         salvarEdicaoPasta,
         modoSelecao, setModoSelecao, itensSelecionados, setItensSelecionados,
         modalMoverVisivel, setModalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
-        pastaSendoMovida,
-        ativarModoSelecao, toggleSelecao, confirmarMovimentacao, cancelarMovimentacao, todasAsPastas
+        ativarModoSelecao, toggleSelecao, confirmarMovimentacao, todasAsPastas
     } = useMateriais();
 
     // ==========================================
@@ -154,7 +153,6 @@ export default function MainContent() {
                         itemMenu={itemMenu}
                         fecharMenu={fecharMenu}
                         acaoEditarMenu={acaoEditarMenu}
-                        acaoMoverMenu={acaoMoverMenu}
                         acaoExcluirMenu={acaoExcluirMenu}
                         confirmacaoVisivel={confirmacaoVisivel}
                         setConfirmacaoVisivel={setConfirmacaoVisivel}
@@ -174,11 +172,9 @@ export default function MainContent() {
                         setModalMoverVisivel={setModalMoverVisivel}
                         caminhoDestinoMover={caminhoDestinoMover}
                         setCaminhoDestinoMover={setCaminhoDestinoMover}
-                        pastaSendoMovida={pastaSendoMovida}
                         ativarModoSelecao={ativarModoSelecao}
                         toggleSelecao={toggleSelecao}
                         confirmarMovimentacao={confirmarMovimentacao}
-                        cancelarMovimentacao={cancelarMovimentacao}
                         todasAsPastas={todasAsPastas}
                     />
                 )}

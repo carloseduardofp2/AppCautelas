@@ -1,11 +1,56 @@
-import { useState, useEffect } from 'react';
-import { Alert, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { db } from '../services/firebaseConfig';
-import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
+import {
+    addDoc,
+    collection,
+    doc,
+    getDocs,
+    onSnapshot,
+    updateDoc,
+    writeBatch
+} from 'firebase/firestore';
 import { removerAcentos } from '../utils/formatters';
 
-// Hook responsável pela Reserva de Materiais: dados do Firestore,
-// navegação de pastas/prateleiras, cadastro e edição de itens.
+const LOCAL_NAO_INFORMADO = 'Não informado';
+const SEPARADOR_CAMINHO = ' › ';
+const LIMITE_OPERACOES_LOTE = 400;
+
+const limparSegmento = (valor) => String(valor ?? '').trim().replace(/\s+/g, ' ');
+const chaveCaminho = (caminho) => JSON.stringify(caminho);
+const caminhosIguais = (a, b) => chaveCaminho(a) === chaveCaminho(b);
+const caminhoEhPrefixo = (prefixo, caminho) =>
+    prefixo.length <= caminho.length && prefixo.every((segmento, indice) => segmento === caminho[indice]);
+
+function obterCaminhoRegistro(registro) {
+    if (Array.isArray(registro?.path)) {
+        return registro.path.map(limparSegmento).filter(Boolean);
+    }
+
+    const local = limparSegmento(registro?.localizacao);
+    const subLocal = limparSegmento(registro?.subLocalizacao);
+
+    if (!local || local === LOCAL_NAO_INFORMADO) return [];
+    return subLocal ? [local, subLocal] : [local];
+}
+
+function obterCamposLegados(caminho) {
+    return {
+        localizacao: caminho[0] || LOCAL_NAO_INFORMADO,
+        subLocalizacao: caminho.length > 1 ? caminho.slice(1).join(SEPARADOR_CAMINHO) : ''
+    };
+}
+
+function compararTextos(a, b) {
+    return removerAcentos(limparSegmento(a)).localeCompare(
+        removerAcentos(limparSegmento(b)),
+        'pt-BR'
+    );
+}
+
+// Reserva de Materiais: sincronização, navegação hierárquica e movimentação.
+// "path" é o formato principal. localizacao/subLocalizacao continuam sendo
+// gravados para manter compatibilidade com telas, relatórios e dados antigos.
 export function useMateriais() {
     const [listaMateriais, setListaMateriais] = useState([]);
     const [pesquisaMateriais, setPesquisaMateriais] = useState('');
@@ -18,6 +63,7 @@ export function useMateriais() {
     const [matNome, setMatNome] = useState('');
     const [matQtd, setMatQtd] = useState('');
     const [matObs, setMatObs] = useState('');
+    const [caminhoCadastroPreferido, setCaminhoCadastroPreferido] = useState([]);
 
     // --- EDIÇÃO DE MATERIAIS ---
     const [modalEditarMaterialVisivel, setModalEditarMaterialVisivel] = useState(false);
@@ -27,88 +73,196 @@ export function useMateriais() {
     const [editMatNome, setEditMatNome] = useState('');
     const [editMatQtd, setEditMatQtd] = useState('');
     const [editMatObs, setEditMatObs] = useState('');
+    const [caminhoEdicaoOriginal, setCaminhoEdicaoOriginal] = useState([]);
 
-    // --- MENU DE ADIÇÃO E PRATELEIRAS ---
+    // --- ADIÇÃO E EDIÇÃO DE PRATELEIRAS ---
     const [modalTipoAdicaoVisivel, setModalTipoAdicaoVisivel] = useState(false);
     const [modalNovaPrateleiraVisivel, setModalNovaPrateleiraVisivel] = useState(false);
     const [nomeNovaPrateleira, setNomeNovaPrateleira] = useState('');
-
-    // --- EDIÇÃO DE PRATELEIRAS ---
     const [modalEditarPastaVisivel, setModalEditarPastaVisivel] = useState(false);
     const [nomeEdicaoPasta, setNomeEdicaoPasta] = useState('');
     const [pastaSendoEditada, setPastaSendoEditada] = useState(null);
 
-    // --- CONEXÃO EM TEMPO REAL COM O FIRESTORE ---
+    // --- MENUS E CONFIRMAÇÕES ---
+    const [menuVisivel, setMenuVisivel] = useState(false);
+    const [itemMenu, setItemMenu] = useState(null);
+    const [confirmacaoVisivel, setConfirmacaoVisivel] = useState(false);
+    const [dadosConfirmacao, setDadosConfirmacao] = useState({ titulo: '', msg: '', acao: null });
+
+    // --- SELEÇÃO E MOVIMENTAÇÃO ---
+    const [modoSelecao, setModoSelecao] = useState(false);
+    const [itensSelecionados, setItensSelecionados] = useState([]);
+    const [modalMoverVisivel, setModalMoverVisivel] = useState(false);
+    const [caminhoDestinoMover, setCaminhoDestinoMover] = useState([]);
+    const [pastaSendoMovida, setPastaSendoMovida] = useState(null);
+
     useEffect(() => {
-        const qMateriais = query(collection(db, 'materiais'));
-        const unsubscribeMateriais = onSnapshot(qMateriais, (snapshot) => {
+        const unsubscribeMateriais = onSnapshot(collection(db, 'materiais'), (snapshot) => {
             const dados = snapshot.docs.map(documento => ({
                 id: documento.id,
                 ...documento.data()
             }));
             setListaMateriais(dados);
         }, (error) => {
-            console.error("Erro ao buscar Materiais: ", error);
-            Alert.alert("Erro", "Não foi possível sincronizar a reserva de materiais.");
+            console.error('Erro ao buscar Materiais:', error);
+            Alert.alert('Erro', 'Não foi possível sincronizar a reserva de materiais.');
         });
 
         return () => unsubscribeMateriais();
     }, []);
 
+    function listarCaminhosDePastas(registros = listaMateriais) {
+        const pastas = new Map();
+
+        registros.forEach(registro => {
+            const caminho = obterCaminhoRegistro(registro);
+
+            // Cada segmento do endereço implica a existência de uma prateleira.
+            // Isso mantém os documentos antigos visíveis mesmo antes da migração.
+            caminho.forEach((_, indice) => {
+                const prefixo = caminho.slice(0, indice + 1);
+                pastas.set(chaveCaminho(prefixo), prefixo);
+            });
+        });
+
+        return [...pastas.values()].sort((a, b) =>
+            a.length - b.length || compararTextos(a.join(SEPARADOR_CAMINHO), b.join(SEPARADOR_CAMINHO))
+        );
+    }
+
+    function resolverCaminhoFormulario(localInformado, subLocalInformado, caminhoPreferido = []) {
+        const local = limparSegmento(localInformado);
+        const subLocal = limparSegmento(subLocalInformado);
+
+        if (!local || local === LOCAL_NAO_INFORMADO) return [];
+
+        if (caminhoPreferido.length > 0) {
+            const camposPreferidos = obterCamposLegados(caminhoPreferido);
+            if (camposPreferidos.localizacao === local && camposPreferidos.subLocalizacao === subLocal) {
+                return caminhoPreferido;
+            }
+        }
+
+        const candidatos = listarCaminhosDePastas().filter(caminho => {
+            const campos = obterCamposLegados(caminho);
+            return campos.localizacao === local && campos.subLocalizacao === subLocal;
+        });
+
+        if (candidatos.length === 1) return candidatos[0];
+
+        const segmentosSubLocal = subLocal
+            ? subLocal.split('›').map(limparSegmento).filter(Boolean)
+            : [];
+
+        return [local, ...segmentosSubLocal];
+    }
+
+    function validarNomePrateleira(nome) {
+        const nomeLimpo = limparSegmento(nome);
+
+        if (!nomeLimpo) {
+            Alert.alert('Atenção', 'Digite o nome da prateleira/local.');
+            return null;
+        }
+
+        if (nomeLimpo.includes('›')) {
+            Alert.alert('Atenção', 'O nome da prateleira não pode conter o caractere "›".');
+            return null;
+        }
+
+        return nomeLimpo;
+    }
+
+    function pastaComMesmoNomeExiste(caminhoPai, nome, caminhoIgnorado = null, registros = listaMateriais) {
+        const nomeComparacao = removerAcentos(nome);
+
+        return listarCaminhosDePastas(registros).some(caminho => {
+            if (caminhoIgnorado && caminhosIguais(caminho, caminhoIgnorado)) return false;
+            if (!caminhosIguais(caminho.slice(0, -1), caminhoPai)) return false;
+            return removerAcentos(caminho[caminho.length - 1]) === nomeComparacao;
+        });
+    }
+
+    async function carregarRegistrosAtuais() {
+        const snapshot = await getDocs(collection(db, 'materiais'));
+        return snapshot.docs.map(documento => ({
+            id: documento.id,
+            ...documento.data()
+        }));
+    }
+
+    async function executarOperacoesEmLotes(operacoes) {
+        for (let inicio = 0; inicio < operacoes.length; inicio += LIMITE_OPERACOES_LOTE) {
+            const lote = writeBatch(db);
+            const grupo = operacoes.slice(inicio, inicio + LIMITE_OPERACOES_LOTE);
+
+            grupo.forEach(({ id, dados, excluir }) => {
+                const referencia = doc(db, 'materiais', id);
+                if (excluir) lote.delete(referencia);
+                else lote.update(referencia, dados);
+            });
+
+            await lote.commit();
+        }
+    }
+
     async function salvarNovoMaterial() {
-        if (matNome.trim() === '' || matQtd.trim() === '') {
+        if (!matNome.trim() || !matQtd.trim()) {
             Alert.alert('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
             return;
         }
 
-        // 🔥 Validação: evita salvar quantidade não-numérica (NaN) no estoque,
-        // o que corromperia futuras somas/relatórios de itens.
-        if (isNaN(Number(matQtd)) || Number(matQtd) < 0) {
+        const quantidade = Number(matQtd);
+        if (!Number.isFinite(quantidade) || quantidade < 0) {
             Alert.alert('Atenção', 'Quantidade inválida. Informe um número válido.');
             return;
         }
 
+        const caminho = resolverCaminhoFormulario(
+            matLocal,
+            matSubLocal,
+            caminhoCadastroPreferido
+        );
+
         try {
             await addDoc(collection(db, 'materiais'), {
-                localizacao: matLocal.trim() || 'Não informado',
-                subLocalizacao: matSubLocal.trim() || '',
-                item: matNome,
-                quantidade: Number(matQtd),
-                observacao: matObs
+                ...obterCamposLegados(caminho),
+                path: caminho,
+                isFolder: false,
+                item: matNome.trim(),
+                quantidade,
+                observacao: matObs.trim()
             });
 
-            setMatLocal(''); setMatSubLocal(''); setMatNome(''); setMatQtd(''); setMatObs('');
+            setMatLocal('');
+            setMatSubLocal('');
+            setMatNome('');
+            setMatQtd('');
+            setMatObs('');
+            setCaminhoCadastroPreferido([]);
             setModalMateriaisVisivel(false);
-            Alert.alert("Sucesso", "Material adicionado ao estoque na nuvem!");
+            Alert.alert('Sucesso', 'Material adicionado ao estoque!');
         } catch (error) {
             console.error(error);
-            Alert.alert("Erro", "Não foi possível cadastrar o material.");
+            Alert.alert('Erro', 'Não foi possível cadastrar o material.');
         }
     }
 
     async function salvarNovaPrateleira() {
-        if (nomeNovaPrateleira.trim() === '') {
-            Alert.alert('Atenção', 'Digite o nome da prateleira/local.');
+        const nome = validarNomePrateleira(nomeNovaPrateleira);
+        if (!nome) return;
+
+        if (pastaComMesmoNomeExiste(caminhoMateriais, nome)) {
+            Alert.alert('Atenção', 'Já existe uma prateleira com esse nome neste local.');
             return;
         }
 
+        const novoCaminho = [...caminhoMateriais, nome];
+
         try {
-            let local = '';
-            let subLocal = '';
-
-            if (caminhoMateriais.length === 0) {
-                local = nomeNovaPrateleira;
-            } else if (caminhoMateriais.length === 1) {
-                local = caminhoMateriais[0];
-                subLocal = nomeNovaPrateleira;
-            } else {
-                Alert.alert('Limite', 'O sistema suporta criar pastas apenas até o nível 2.');
-                return;
-            }
-
             await addDoc(collection(db, 'materiais'), {
-                localizacao: local,
-                subLocalizacao: subLocal,
+                ...obterCamposLegados(novoCaminho),
+                path: novoCaminho,
                 isFolder: true,
                 item: '',
                 quantidade: 0,
@@ -125,10 +279,12 @@ export function useMateriais() {
 
     function abrirCadastroMaterialContextual() {
         setModalTipoAdicaoVisivel(false);
+        const campos = obterCamposLegados(caminhoMateriais);
 
         setTimeout(() => {
-            setMatLocal(caminhoMateriais.length > 0 ? caminhoMateriais[0] : '');
-            setMatSubLocal(caminhoMateriais.length > 1 ? caminhoMateriais[1] : '');
+            setCaminhoCadastroPreferido(caminhoMateriais);
+            setMatLocal(caminhoMateriais.length ? campos.localizacao : '');
+            setMatSubLocal(campos.subLocalizacao);
             setMatNome('');
             setMatQtd('');
             setMatObs('');
@@ -137,54 +293,56 @@ export function useMateriais() {
     }
 
     function prepararEdicaoMaterial(material) {
+        const caminho = obterCaminhoRegistro(material);
+        const campos = obterCamposLegados(caminho);
+
         setIdMaterialEditando(material.id);
-        setEditMatLocal(material.localizacao === 'Não informado' ? '' : material.localizacao);
-        setEditMatSubLocal(material.subLocalizacao || '');
-        setEditMatNome(material.item);
-        setEditMatQtd(String(material.quantidade));
+        setCaminhoEdicaoOriginal(caminho);
+        setEditMatLocal(caminho.length ? campos.localizacao : '');
+        setEditMatSubLocal(campos.subLocalizacao);
+        setEditMatNome(material.item || '');
+        setEditMatQtd(String(material.quantidade ?? 0));
         setEditMatObs(material.observacao || '');
         setModalEditarMaterialVisivel(true);
     }
 
     async function salvarEdicaoMaterial() {
-        if (editMatNome.trim() === '' || editMatQtd.trim() === '') {
+        if (!editMatNome.trim() || !editMatQtd.trim()) {
             Alert.alert('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
             return;
         }
 
-        // 🔥 Mesma validação do cadastro, aplicada também na edição.
-        if (isNaN(Number(editMatQtd)) || Number(editMatQtd) < 0) {
+        const quantidade = Number(editMatQtd);
+        if (!Number.isFinite(quantidade) || quantidade < 0) {
             Alert.alert('Atenção', 'Quantidade inválida. Informe um número válido.');
             return;
         }
 
+        const caminho = resolverCaminhoFormulario(
+            editMatLocal,
+            editMatSubLocal,
+            caminhoEdicaoOriginal
+        );
+
         try {
-            const docRef = doc(db, 'materiais', idMaterialEditando);
-            await updateDoc(docRef, {
-                localizacao: editMatLocal.trim() || 'Não informado',
-                subLocalizacao: editMatSubLocal.trim() || '',
+            await updateDoc(doc(db, 'materiais', idMaterialEditando), {
+                ...obterCamposLegados(caminho),
+                path: caminho,
+                isFolder: false,
                 item: editMatNome.trim(),
-                quantidade: Number(editMatQtd),
+                quantidade,
                 observacao: editMatObs.trim()
             });
 
             setModalEditarMaterialVisivel(false);
             setIdMaterialEditando(null);
-            Alert.alert("Sucesso", "Material atualizado com sucesso!");
+            setCaminhoEdicaoOriginal([]);
+            Alert.alert('Sucesso', 'Material atualizado com sucesso!');
         } catch (error) {
             console.error(error);
-            Alert.alert("Erro", "Não foi possível atualizar o material.");
+            Alert.alert('Erro', 'Não foi possível atualizar o material.');
         }
     }
-
-    // ==========================================
-    // --- NOVOS ESTADOS PARA MODAIS CUSTOMIZADOS ---
-    // ==========================================
-    const [menuVisivel, setMenuVisivel] = useState(false);
-    const [itemMenu, setItemMenu] = useState(null); // Guarda se é pasta ou item
-    
-    const [confirmacaoVisivel, setConfirmacaoVisivel] = useState(false);
-    const [dadosConfirmacao, setDadosConfirmacao] = useState({ titulo: '', msg: '', acao: null });
 
     function abrirOpcoesPasta(pasta) {
         setItemMenu({ tipo: 'pasta', dados: pasta });
@@ -203,76 +361,84 @@ export function useMateriais() {
 
     function acaoEditarMenu() {
         const item = itemMenu;
-        setMenuVisivel(false); 
-        
+        if (!item) return;
+        setMenuVisivel(false);
+
         setTimeout(() => {
             if (item.tipo === 'pasta') {
                 setPastaSendoEditada(item.dados);
-                setNomeEdicaoPasta(item.dados.nome); // Preenche o input com o nome atual
+                setNomeEdicaoPasta(item.dados.nome);
                 setModalEditarPastaVisivel(true);
             } else {
                 prepararEdicaoMaterial(item.dados);
             }
-        }, 300); 
+        }, 250);
     }
 
     async function salvarEdicaoPasta() {
-        if (nomeEdicaoPasta.trim() === '') {
-            Alert.alert('Atenção', 'O nome da pasta não pode ser vazio.');
+        if (!pastaSendoEditada) return;
+
+        const novoNome = validarNomePrateleira(nomeEdicaoPasta);
+        if (!novoNome) return;
+
+        const caminhoAntigo = pastaSendoEditada.path;
+        const caminhoPai = caminhoAntigo.slice(0, -1);
+        const novoCaminho = [...caminhoPai, novoNome];
+
+        if (caminhosIguais(caminhoAntigo, novoCaminho)) {
+            setModalEditarPastaVisivel(false);
+            setPastaSendoEditada(null);
             return;
         }
 
         try {
-            const ehNivel1 = pastaSendoEditada.path.length === 1;
-            let qItensRef;
+            const registros = await carregarRegistrosAtuais();
 
-            // Busca TODOS os itens que estão dentro desta pasta
-            if (ehNivel1) {
-                qItensRef = query(collection(db, 'materiais'), where('localizacao', '==', pastaSendoEditada.nome));
-            } else {
-                qItensRef = query(collection(db, 'materiais'),
-                    where('localizacao', '==', pastaSendoEditada.path[0]),
-                    where('subLocalizacao', '==', pastaSendoEditada.nome)
-                );
+            if (pastaComMesmoNomeExiste(caminhoPai, novoNome, caminhoAntigo, registros)) {
+                Alert.alert('Atenção', 'Já existe uma prateleira com esse nome neste local.');
+                return;
             }
 
-            const querySnapshot = await getDocs(qItensRef);
-            
-            // Prepara a atualização de todos os itens encontrados
-            const promessasAtualizacao = querySnapshot.docs.map(documento => {
-                const ref = doc(db, 'materiais', documento.id);
-                if (ehNivel1) {
-                    return updateDoc(ref, { localizacao: nomeEdicaoPasta.trim() });
-                } else {
-                    return updateDoc(ref, { subLocalizacao: nomeEdicaoPasta.trim() });
-                }
-            });
+            const operacoes = registros
+                .filter(registro => caminhoEhPrefixo(caminhoAntigo, obterCaminhoRegistro(registro)))
+                .map(registro => {
+                    const caminhoAtual = obterCaminhoRegistro(registro);
+                    const caminhoAtualizado = [
+                        ...novoCaminho,
+                        ...caminhoAtual.slice(caminhoAntigo.length)
+                    ];
 
-            // Executa todas as atualizações de uma vez
-            await Promise.all(promessasAtualizacao);
+                    return {
+                        id: registro.id,
+                        dados: {
+                            ...obterCamposLegados(caminhoAtualizado),
+                            path: caminhoAtualizado
+                        }
+                    };
+                });
 
-            // Limpa o modal e joga o usuário para o início (para não ficar preso em um caminho que mudou de nome)
+            await executarOperacoesEmLotes(operacoes);
+
             setModalEditarPastaVisivel(false);
             setPastaSendoEditada(null);
             setNomeEdicaoPasta('');
-            setCaminhoMateriais([]); 
-            
+            setCaminhoMateriais([]);
         } catch (error) {
             console.error(error);
-            Alert.alert("Erro", "Não foi possível renomear a pasta.");
+            Alert.alert('Erro', 'Não foi possível renomear a prateleira.');
         }
     }
 
     function acaoExcluirMenu() {
         const item = itemMenu;
-        setMenuVisivel(false); // Esconde o menu de opções
-        
-        // Configura e abre o Modal de Confirmação customizado
+        if (!item) return;
+        setMenuVisivel(false);
+
         setTimeout(() => {
             if (item.tipo === 'pasta') {
                 setDadosConfirmacao({
-                    titulo: 'Excluir Local',
-                    msg: `Tem certeza que deseja excluir "${item.dados.nome}" e TODOS os materiais dentro dela?`,
+                    titulo: 'Excluir Prateleira',
+                    msg: `Tem certeza que deseja excluir "${item.dados.nome}", suas prateleiras internas e TODOS os materiais guardados nelas?`,
                     acao: async () => {
                         setConfirmacaoVisivel(false);
                         await executarExclusaoPasta(item.dados);
@@ -281,104 +447,262 @@ export function useMateriais() {
             } else {
                 setDadosConfirmacao({
                     titulo: 'Remover do Estoque',
-                    msg: `Deseja permanentemente excluir o item ${item.dados.item}?`,
+                    msg: `Deseja excluir permanentemente o item "${item.dados.item}"?`,
                     acao: async () => {
                         setConfirmacaoVisivel(false);
-                        await deleteDoc(doc(db, 'materiais', item.dados.id));
+                        try {
+                            await executarOperacoesEmLotes([{ id: item.dados.id, excluir: true }]);
+                        } catch (error) {
+                            console.error(error);
+                            Alert.alert('Erro', 'Não foi possível excluir o material.');
+                        }
                     }
                 });
             }
             setConfirmacaoVisivel(true);
-        }, 300);
+        }, 250);
     }
 
     async function executarExclusaoPasta(pasta) {
         try {
-            const ehNivel1 = pasta.path.length === 1;
-            let qItensRef;
+            const registros = await carregarRegistrosAtuais();
+            const operacoes = registros
+                .filter(registro => caminhoEhPrefixo(pasta.path, obterCaminhoRegistro(registro)))
+                .map(registro => ({ id: registro.id, excluir: true }));
 
-            if (ehNivel1) {
-                qItensRef = query(collection(db, 'materiais'), where('localizacao', '==', pasta.nome));
-            } else {
-                qItensRef = query(collection(db, 'materiais'),
-                    where('localizacao', '==', pasta.path[0]),
-                    where('subLocalizacao', '==', pasta.nome)
-                );
-            }
-
-            const querySnapshot = await getDocs(qItensRef);
-            const promessasDelecao = querySnapshot.docs.map(documento => deleteDoc(doc(db, 'materiais', documento.id)));
-            await Promise.all(promessasDelecao);
+            await executarOperacoesEmLotes(operacoes);
+            setCaminhoMateriais([]);
         } catch (error) {
             console.error(error);
+            Alert.alert('Erro', 'Não foi possível excluir a prateleira.');
         }
     }
 
-    const obterItensExibicao = () => {
-        const termo = removerAcentos(pesquisaMateriais);
+    const caminhosPastas = listarCaminhosDePastas();
 
-        if (termo !== '') {
-            const itens = listaMateriais.filter(m =>
-                !m.isFolder && (
-                    removerAcentos(m.item || '').includes(termo) ||
-                    removerAcentos(m.localizacao || '').includes(termo) ||
-                    removerAcentos(m.subLocalizacao || '').includes(termo)
+    function contarMateriaisDentro(caminho) {
+        return listaMateriais.filter(registro =>
+            !registro.isFolder && caminhoEhPrefixo(caminho, obterCaminhoRegistro(registro))
+        ).length;
+    }
+
+    function montarPasta(caminho) {
+        return {
+            id: `pasta-${chaveCaminho(caminho)}`,
+            nome: caminho[caminho.length - 1],
+            caminhoCompleto: caminho.join(SEPARADOR_CAMINHO),
+            count: contarMateriaisDentro(caminho),
+            path: caminho
+        };
+    }
+
+    function obterItensExibicao() {
+        const termo = removerAcentos(pesquisaMateriais).trim();
+
+        if (termo) {
+            const itens = listaMateriais
+                .filter(registro => {
+                    if (registro.isFolder) return false;
+                    const caminhoTexto = obterCaminhoRegistro(registro).join(' ');
+                    return [
+                        registro.item,
+                        registro.observacao,
+                        registro.localizacao,
+                        registro.subLocalizacao,
+                        caminhoTexto
+                    ].some(valor => removerAcentos(valor || '').includes(termo));
+                })
+                .sort((a, b) => compararTextos(a.item, b.item))
+                .map(registro => ({
+                    ...registro,
+                    caminhoExibicao: obterCaminhoRegistro(registro).join(SEPARADOR_CAMINHO) || 'Início'
+                }));
+
+            const pastas = caminhosPastas
+                .filter(caminho =>
+                    removerAcentos(caminho.join(' ')).includes(termo) ||
+                    removerAcentos(caminho[caminho.length - 1]).includes(termo)
                 )
-            );
+                .map(montarPasta);
 
-            const pastasEncontradas = [];
-
-            const locaisUnicos = [...new Set(listaMateriais.map(m => m.localizacao).filter(l => l && l !== 'Não informado'))];
-            locaisUnicos.forEach(loc => {
-                if (removerAcentos(loc).includes(termo)) {
-                    const count = listaMateriais.filter(m => m.localizacao === loc && !m.isFolder).length;
-                    pastasEncontradas.push({ nome: loc, count, path: [loc] });
-                }
-            });
-
-            const subLocais = listaMateriais.filter(m => m.subLocalizacao && m.subLocalizacao !== '').map(m => ({ loc: m.localizacao, sub: m.subLocalizacao }));
-            const subLocaisUnicos = [...new Set(subLocais.map(x => JSON.stringify(x)))].map(x => JSON.parse(x));
-
-            subLocaisUnicos.forEach(obj => {
-                if (removerAcentos(obj.sub).includes(termo)) {
-                    const count = listaMateriais.filter(m => m.localizacao === obj.loc && m.subLocalizacao === obj.sub && !m.isFolder).length;
-                    pastasEncontradas.push({ nome: obj.sub, count, path: [obj.loc, obj.sub] });
-                }
-            });
-
-            return { pastas: pastasEncontradas, itens };
-        }
-
-        if (caminhoMateriais.length === 0) {
-            const locaisUnicos = [...new Set(listaMateriais.map(m => m.localizacao).filter(l => l && l !== 'Não informado'))];
-            const pastas = locaisUnicos.map(loc => {
-                const count = listaMateriais.filter(m => m.localizacao === loc && !m.isFolder).length;
-                return { nome: loc, count, path: [loc] };
-            });
-            const itens = listaMateriais.filter(m => (!m.localizacao || m.localizacao === 'Não informado') && !m.isFolder);
             return { pastas, itens };
         }
 
-        if (caminhoMateriais.length === 1) {
-            const localAtual = caminhoMateriais[0];
-            const materiaisNoLocal = listaMateriais.filter(m => m.localizacao === localAtual);
-            const subLocaisUnicos = [...new Set(materiaisNoLocal.map(m => m.subLocalizacao).filter(Boolean))];
+        const pastas = caminhosPastas
+            .filter(caminho =>
+                caminho.length === caminhoMateriais.length + 1 &&
+                caminhoEhPrefixo(caminhoMateriais, caminho)
+            )
+            .map(montarPasta);
 
-            const pastas = subLocaisUnicos.map(sub => {
-                const count = materiaisNoLocal.filter(m => m.subLocalizacao === sub && !m.isFolder).length;
-                return { nome: sub, count, path: [localAtual, sub] };
-            });
-            const itens = materiaisNoLocal.filter(m => !m.subLocalizacao && !m.isFolder);
-            return { pastas, itens };
-        }
+        const itens = listaMateriais
+            .filter(registro =>
+                !registro.isFolder &&
+                caminhosIguais(obterCaminhoRegistro(registro), caminhoMateriais)
+            )
+            .sort((a, b) => compararTextos(a.item, b.item));
 
-        const localAtual = caminhoMateriais[0];
-        const subLocalAtual = caminhoMateriais[1];
-        const itens = listaMateriais.filter(m => m.localizacao === localAtual && m.subLocalizacao === subLocalAtual && !m.isFolder);
-        return { pastas: [], itens };
-    };
+        return { pastas, itens };
+    }
 
     const { pastas: pastasExibicao, itens: itensExibicao } = obterItensExibicao();
+
+    function ativarModoSelecao(id) {
+        setModoSelecao(true);
+        setItensSelecionados(atuais => atuais.includes(id) ? atuais : [...atuais, id]);
+    }
+
+    function toggleSelecao(id) {
+        setItensSelecionados(atuais => {
+            const novaLista = atuais.includes(id)
+                ? atuais.filter(itemId => itemId !== id)
+                : [...atuais, id];
+
+            if (novaLista.length === 0) setModoSelecao(false);
+            return novaLista;
+        });
+    }
+
+    function acaoMoverMenu() {
+        const item = itemMenu;
+        if (!item) return;
+
+        setMenuVisivel(false);
+        setCaminhoDestinoMover([]);
+
+        setTimeout(() => {
+            if (item.tipo === 'pasta') {
+                setPastaSendoMovida(item.dados);
+                setModoSelecao(false);
+                setItensSelecionados([]);
+            } else {
+                setPastaSendoMovida(null);
+                setItensSelecionados([item.dados.id]);
+            }
+            setModalMoverVisivel(true);
+        }, 250);
+    }
+
+    function cancelarMovimentacao() {
+        setModalMoverVisivel(false);
+        setCaminhoDestinoMover([]);
+        setPastaSendoMovida(null);
+        setModoSelecao(false);
+        setItensSelecionados([]);
+    }
+
+    async function moverItensSelecionados() {
+        if (itensSelecionados.length === 0) {
+            Alert.alert('Atenção', 'Selecione pelo menos um material.');
+            return;
+        }
+
+        const camposLegados = obterCamposLegados(caminhoDestinoMover);
+        const operacoes = itensSelecionados.map(id => ({
+            id,
+            dados: {
+                ...camposLegados,
+                path: caminhoDestinoMover,
+                isFolder: false
+            }
+        }));
+
+        await executarOperacoesEmLotes(operacoes);
+        Alert.alert('Sucesso', `${itensSelecionados.length} material(is) movido(s) com sucesso!`);
+    }
+
+    async function moverPasta() {
+        const caminhoOrigem = pastaSendoMovida.path;
+        const caminhoPaiAtual = caminhoOrigem.slice(0, -1);
+
+        if (
+            caminhosIguais(caminhoDestinoMover, caminhoOrigem) ||
+            caminhoEhPrefixo(caminhoOrigem, caminhoDestinoMover)
+        ) {
+            Alert.alert('Atenção', 'Uma prateleira não pode ser movida para dentro dela mesma.');
+            return false;
+        }
+
+        if (caminhosIguais(caminhoDestinoMover, caminhoPaiAtual)) {
+            Alert.alert('Atenção', 'Esta prateleira já está nesse local.');
+            return false;
+        }
+
+        const registros = await carregarRegistrosAtuais();
+        const nomePasta = caminhoOrigem[caminhoOrigem.length - 1];
+
+        if (pastaComMesmoNomeExiste(caminhoDestinoMover, nomePasta, caminhoOrigem, registros)) {
+            Alert.alert('Atenção', 'O destino já possui uma prateleira com esse nome.');
+            return false;
+        }
+
+        const novoCaminhoBase = [...caminhoDestinoMover, nomePasta];
+        const operacoes = registros
+            .filter(registro => caminhoEhPrefixo(caminhoOrigem, obterCaminhoRegistro(registro)))
+            .map(registro => {
+                const caminhoAtual = obterCaminhoRegistro(registro);
+                const caminhoAtualizado = [
+                    ...novoCaminhoBase,
+                    ...caminhoAtual.slice(caminhoOrigem.length)
+                ];
+
+                return {
+                    id: registro.id,
+                    dados: {
+                        ...obterCamposLegados(caminhoAtualizado),
+                        path: caminhoAtualizado
+                    }
+                };
+            });
+
+        await executarOperacoesEmLotes(operacoes);
+        Alert.alert('Sucesso', 'Prateleira e todo o seu conteúdo foram movidos!');
+        setCaminhoMateriais([]);
+        return true;
+    }
+
+    async function confirmarMovimentacao() {
+        try {
+            if (pastaSendoMovida) {
+                const moveu = await moverPasta();
+                if (!moveu) return;
+            } else {
+                await moverItensSelecionados();
+            }
+
+            setModoSelecao(false);
+            setItensSelecionados([]);
+            setModalMoverVisivel(false);
+            setCaminhoDestinoMover([]);
+            setPastaSendoMovida(null);
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Erro', 'Não foi possível concluir a movimentação.');
+        }
+    }
+
+    const todasAsPastas = [
+        {
+            nomeExibicao: '🏠 Raiz Principal (Início)',
+            pathFuturo: [],
+            id: 'raiz'
+        },
+        ...caminhosPastas
+            .filter(caminho => {
+                if (!pastaSendoMovida) return true;
+                const origem = pastaSendoMovida.path;
+                const paiAtual = origem.slice(0, -1);
+                return !caminhoEhPrefixo(origem, caminho) && !caminhosIguais(caminho, paiAtual);
+            })
+            .map(caminho => ({
+                nomeExibicao: `📁 ${caminho.join(SEPARADOR_CAMINHO)}`,
+                pathFuturo: caminho,
+                id: `destino-${chaveCaminho(caminho)}`
+            }))
+    ].filter(destino => {
+        if (!pastaSendoMovida || destino.pathFuturo.length > 0) return true;
+        return pastaSendoMovida.path.length > 1;
+    });
 
     return {
         listaMateriais,
@@ -405,16 +729,22 @@ export function useMateriais() {
         nomeNovaPrateleira, setNomeNovaPrateleira,
         salvarNovaPrateleira,
         pastasExibicao, itensExibicao,
-        abrirOpcoesPasta, abrirOpcoesItem,menuVisivel, 
-        itemMenu, 
-        fecharMenu, 
-        acaoEditarMenu, 
-        acaoExcluirMenu,
-        confirmacaoVisivel, 
-        setConfirmacaoVisivel, 
-        dadosConfirmacao,
+        abrirOpcoesPasta, abrirOpcoesItem,
+        menuVisivel, itemMenu, fecharMenu,
+        acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
+        confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao,
         modalEditarPastaVisivel, setModalEditarPastaVisivel,
         nomeEdicaoPasta, setNomeEdicaoPasta,
-        salvarEdicaoPasta
+        salvarEdicaoPasta,
+        modoSelecao, setModoSelecao,
+        itensSelecionados, setItensSelecionados,
+        modalMoverVisivel, setModalMoverVisivel,
+        caminhoDestinoMover, setCaminhoDestinoMover,
+        pastaSendoMovida,
+        ativarModoSelecao,
+        toggleSelecao,
+        confirmarMovimentacao,
+        cancelarMovimentacao,
+        todasAsPastas
     };
 }
