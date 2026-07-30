@@ -3,8 +3,8 @@ import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, S
 import { styles } from '../styles/MainStyles';
 
 export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem, menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
-  confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao, modalEditarPastaVisivel, setModalEditarPastaVisivel, nomeEdicaoPasta, setNomeEdicaoPasta, salvarEdicaoPasta, modoSelecao, setModoSelecao, itensSelecionados, setItensSelecionados,
-  modalMoverVisivel, setModalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
+  confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao, modalEditarPastaVisivel, setModalEditarPastaVisivel, nomeEdicaoPasta, setNomeEdicaoPasta, salvarEdicaoPasta, modoSelecao, itensSelecionados,
+  modalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
   pastaSendoMovida, ativarModoSelecao, toggleSelecao, confirmarMovimentacao, cancelarMovimentacao, todasAsPastas }) {
   return (
     <View style={styles.secaoContainer}>
@@ -213,34 +213,6 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* ========================================== */}
-      {/* BARRA FLUTUANTE DE SELEÇÃO MÚLTIPLA          */}
-      {/* ========================================== */}
-      {modoSelecao && (
-        <View style={{
-          position: 'absolute', bottom: 20, left: 20, right: 20,
-          backgroundColor: '#1E293B', padding: 15, borderRadius: 12,
-          flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-          borderWidth: 1, borderColor: '#D4A25F',
-          shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5
-        }}>
-          <Text style={{ color: '#FFF', fontWeight: 'bold' }}>
-            {itensSelecionados.length} selecionado(s)
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity onPress={() => { setModoSelecao(false); setItensSelecionados([]); }}>
-              <Text style={{ color: '#94A3B8', padding: 10 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ backgroundColor: '#D4A25F', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8 }}
-              onPress={() => setModalMoverVisivel(true)}
-            >
-              <Text style={{ color: '#0F172A', fontWeight: 'bold' }}>Mover</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
       {/* ========================================== */}
       {/* MODAL PARA ESCOLHER A PASTA DE DESTINO       */}

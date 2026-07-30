@@ -37,6 +37,40 @@ export function useCautelas() {
     const [materiaisCautela, setMateriaisCautela] = useState([{ nome: '', quantidade: '' }]);
     const [novaObs, setNovaObs] = useState('');
     const [novoMilSecOpCautela, setNovoMilSecOpCautela] = useState('');
+    const aoCriarCautelaRef = useRef(null);
+
+    const abrirNovaCautela = () => {
+        aoCriarCautelaRef.current = null;
+        setModalVisivel(true);
+    };
+
+    const fecharNovaCautela = () => {
+        aoCriarCautelaRef.current = null;
+        setModalVisivel(false);
+    };
+
+    const iniciarCautelaComMateriais = (materiais, aoSalvarComSucesso = null) => {
+        const linhas = Array.isArray(materiais)
+            ? materiais
+                .filter(material => String(material?.nome ?? material?.item ?? '').trim() !== '')
+                .map(material => ({
+                    ...material,
+                    nome: String(material.nome ?? material.item).trim(),
+                    quantidade: String(material.quantidadeCautela ?? material.quantidade ?? '1')
+                }))
+            : [];
+
+        if (linhas.length === 0) {
+            Alert.alert('Atenção', 'Selecione pelo menos um material válido.');
+            return false;
+        }
+
+        setMateriaisCautela(linhas);
+        aoCriarCautelaRef.current =
+            typeof aoSalvarComSucesso === 'function' ? aoSalvarComSucesso : null;
+        setModalVisivel(true);
+        return true;
+    };
 
     const adicionarLinhaMaterial = () => {
         setMateriaisCautela(prev => [...prev, { nome: '', quantidade: '' }]);
@@ -45,7 +79,24 @@ export function useCautelas() {
         setMateriaisCautela(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== index));
     };
     const atualizarLinhaMaterial = (index, campo, valor) => {
-        setMateriaisCautela(prev => prev.map((item, i) => i === index ? { ...item, [campo]: valor } : item));
+        setMateriaisCautela(prev => prev.map((item, i) => {
+            if (i !== index) return item;
+
+            // Se o nome de um item vindo do estoque for alterado manualmente,
+            // ele deixa de apontar para aquele registro para não salvar um vínculo incorreto.
+            if (campo === 'nome' && item.materialId && valor.trim() !== item.nome.trim()) {
+                const {
+                    materialId,
+                    estoqueDisponivel,
+                    caminhoEstoque,
+                    caminhoExibicao,
+                    ...linhaManual
+                } = item;
+                return { ...linhaManual, nome: valor };
+            }
+
+            return { ...item, [campo]: valor };
+        }));
     };
 
     // --- ASSINATURA / DEVOLUÇÃO ---
@@ -156,14 +207,27 @@ export function useCautelas() {
 
         if (operacao === 'criar') {
             // 🔥 Valida cada linha de material: nome preenchido e quantidade numérica > 0.
-            const materiaisValidos = materiaisCautela.filter(m => m.nome.trim() !== '');
+            const materiaisValidos = materiaisCautela.filter(
+                m => String(m?.nome ?? '').trim() !== ''
+            );
             if (materiaisValidos.length === 0) {
                 Alert.alert('Atenção', 'Adicione ao menos um material.');
                 return;
             }
             for (const m of materiaisValidos) {
-                if (isNaN(Number(m.quantidade)) || Number(m.quantidade) <= 0) {
+                const quantidade = Number(m.quantidade);
+                if (!Number.isFinite(quantidade) || quantidade <= 0) {
                     Alert.alert('Atenção', `Quantidade inválida para "${m.nome}". Informe um número maior que zero.`);
+                    return;
+                }
+                if (
+                    m.estoqueDisponivel !== undefined &&
+                    quantidade > Number(m.estoqueDisponivel)
+                ) {
+                    Alert.alert(
+                        'Quantidade indisponível',
+                        `Há somente ${m.estoqueDisponivel} unidade(s) de "${m.nome}" no estoque.`
+                    );
                     return;
                 }
             }
@@ -190,6 +254,9 @@ export function useCautelas() {
                 await addDoc(collection(db, 'cautelas'), novaCautela);
                 setModalAssinatura(false);
                 setNovoMilitar(''); setNovaOm(''); setMateriaisCautela([{ nome: '', quantidade: '' }]); setNovaObs(''); setNovoMilSecOpCautela('');
+                const aoCriarCautela = aoCriarCautelaRef.current;
+                aoCriarCautelaRef.current = null;
+                aoCriarCautela?.();
                 Alert.alert("Sucesso", "Cautela registrada no sistema!");
             } catch (error) {
                 console.error("Erro ao salvar cautela: ", error);
@@ -284,6 +351,7 @@ export function useCautelas() {
         listaCautelas, isExportando,
         pesquisa, setPesquisa,
         modalVisivel, setModalVisivel,
+        abrirNovaCautela, fecharNovaCautela, iniciarCautelaComMateriais,
         novoMilitar, setNovoMilitar,
         novaOm, setNovaOm,
         materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,

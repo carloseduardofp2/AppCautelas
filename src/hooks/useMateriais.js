@@ -89,7 +89,7 @@ export function useMateriais() {
     const [confirmacaoVisivel, setConfirmacaoVisivel] = useState(false);
     const [dadosConfirmacao, setDadosConfirmacao] = useState({ titulo: '', msg: '', acao: null });
 
-    // --- SELEÇÃO E MOVIMENTAÇÃO ---
+    // --- SELEÇÃO, MOVIMENTAÇÃO E ENVIO PARA CAUTELA ---
     const [modoSelecao, setModoSelecao] = useState(false);
     const [itensSelecionados, setItensSelecionados] = useState([]);
     const [modalMoverVisivel, setModalMoverVisivel] = useState(false);
@@ -563,6 +563,76 @@ export function useMateriais() {
         });
     }
 
+    function limparSelecao() {
+        setModoSelecao(false);
+        setItensSelecionados([]);
+    }
+
+    function obterMateriaisSelecionadosParaCautela() {
+        if (itensSelecionados.length === 0) {
+            Alert.alert('Atenção', 'Selecione pelo menos um material.');
+            return null;
+        }
+
+        const materiaisPorId = new Map(
+            listaMateriais
+                .filter(registro => !registro.isFolder)
+                .map(registro => [registro.id, registro])
+        );
+
+        const registrosSelecionados = itensSelecionados
+            .map(id => materiaisPorId.get(id))
+            .filter(Boolean);
+
+        if (registrosSelecionados.length !== itensSelecionados.length) {
+            const idsAindaExistentes = registrosSelecionados.map(registro => registro.id);
+            setItensSelecionados(idsAindaExistentes);
+            if (idsAindaExistentes.length === 0) setModoSelecao(false);
+
+            Alert.alert(
+                'Lista atualizada',
+                'Um dos materiais selecionados não existe mais. Confira a seleção e tente novamente.'
+            );
+            return null;
+        }
+
+        const semSaldo = registrosSelecionados.filter(
+            registro => !Number.isFinite(Number(registro.quantidade)) || Number(registro.quantidade) <= 0
+        );
+
+        if (semSaldo.length > 0) {
+            Alert.alert(
+                'Material sem saldo',
+                `Não há quantidade disponível para: ${semSaldo.map(registro => registro.item).join(', ')}.`
+            );
+            return null;
+        }
+
+        return registrosSelecionados.map(registro => {
+            const caminho = obterCaminhoRegistro(registro);
+
+            return {
+                nome: String(registro.item || '').trim(),
+                quantidade: '1',
+                materialId: registro.id,
+                estoqueDisponivel: Number(registro.quantidade),
+                caminhoEstoque: caminho,
+                caminhoExibicao: caminho.join(SEPARADOR_CAMINHO) || 'Início'
+            };
+        });
+    }
+
+    function abrirMovimentacaoSelecionados() {
+        if (itensSelecionados.length === 0) {
+            Alert.alert('Atenção', 'Selecione pelo menos um material.');
+            return;
+        }
+
+        setPastaSendoMovida(null);
+        setCaminhoDestinoMover([]);
+        setModalMoverVisivel(true);
+    }
+
     function acaoMoverMenu() {
         const item = itemMenu;
         if (!item) return;
@@ -587,8 +657,7 @@ export function useMateriais() {
         setModalMoverVisivel(false);
         setCaminhoDestinoMover([]);
         setPastaSendoMovida(null);
-        setModoSelecao(false);
-        setItensSelecionados([]);
+        limparSelecao();
     }
 
     async function moverItensSelecionados() {
@@ -670,8 +739,7 @@ export function useMateriais() {
                 await moverItensSelecionados();
             }
 
-            setModoSelecao(false);
-            setItensSelecionados([]);
+            limparSelecao();
             setModalMoverVisivel(false);
             setCaminhoDestinoMover([]);
             setPastaSendoMovida(null);
@@ -736,13 +804,16 @@ export function useMateriais() {
         modalEditarPastaVisivel, setModalEditarPastaVisivel,
         nomeEdicaoPasta, setNomeEdicaoPasta,
         salvarEdicaoPasta,
-        modoSelecao, setModoSelecao,
-        itensSelecionados, setItensSelecionados,
-        modalMoverVisivel, setModalMoverVisivel,
+        modoSelecao,
+        itensSelecionados,
+        modalMoverVisivel,
         caminhoDestinoMover, setCaminhoDestinoMover,
         pastaSendoMovida,
         ativarModoSelecao,
         toggleSelecao,
+        limparSelecao,
+        obterMateriaisSelecionadosParaCautela,
+        abrirMovimentacaoSelecionados,
         confirmarMovimentacao,
         cancelarMovimentacao,
         todasAsPastas

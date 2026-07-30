@@ -27,6 +27,7 @@ export default function MainContent() {
         listaCautelas, isExportando,
         pesquisa, setPesquisa,
         modalVisivel, setModalVisivel,
+        abrirNovaCautela, fecharNovaCautela, iniciarCautelaComMateriais,
         novoMilitar, setNovoMilitar,
         novaOm, setNovaOm,
         materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
@@ -89,11 +90,21 @@ export default function MainContent() {
         modalEditarPastaVisivel, setModalEditarPastaVisivel,
         nomeEdicaoPasta, setNomeEdicaoPasta,
         salvarEdicaoPasta,
-        modoSelecao, setModoSelecao, itensSelecionados, setItensSelecionados,
-        modalMoverVisivel, setModalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
+        modoSelecao, itensSelecionados,
+        modalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
         pastaSendoMovida,
-        ativarModoSelecao, toggleSelecao, confirmarMovimentacao, cancelarMovimentacao, todasAsPastas
+        ativarModoSelecao, toggleSelecao, limparSelecao,
+        obterMateriaisSelecionadosParaCautela, abrirMovimentacaoSelecionados,
+        confirmarMovimentacao, cancelarMovimentacao, todasAsPastas
     } = useMateriais();
+
+    const abrirCautelaComMateriaisSelecionados = () => {
+        const materiaisSelecionados = obterMateriaisSelecionadosParaCautela();
+        if (!materiaisSelecionados) return;
+
+        const iniciou = iniciarCautelaComMateriais(materiaisSelecionados, limparSelecao);
+        if (iniciou) setAbaAtiva('Livro');
+    };
 
     // ==========================================
     // RENDERIZAÇÃO (VISUAL DO APLICATIVO)
@@ -167,11 +178,8 @@ export default function MainContent() {
                         salvarEdicaoPasta={salvarEdicaoPasta}
 
                         modoSelecao={modoSelecao}
-                        setModoSelecao={setModoSelecao}
                         itensSelecionados={itensSelecionados}
-                        setItensSelecionados={setItensSelecionados}
                         modalMoverVisivel={modalMoverVisivel}
-                        setModalMoverVisivel={setModalMoverVisivel}
                         caminhoDestinoMover={caminhoDestinoMover}
                         setCaminhoDestinoMover={setCaminhoDestinoMover}
                         pastaSendoMovida={pastaSendoMovida}
@@ -188,7 +196,7 @@ export default function MainContent() {
             {/* --- INSERÇÃO DOS MODAIS --- */}
             {modalVisivel && (
                 <ModalNovaCautela
-                    fechar={() => setModalVisivel(false)}
+                    fechar={fecharNovaCautela}
                     novoMilitar={novoMilitar} setNovoMilitar={setNovoMilitar}
                     novaOm={novaOm} setNovaOm={setNovaOm}
                     materiaisCautela={materiaisCautela}
@@ -306,6 +314,38 @@ export default function MainContent() {
             {/* COMPONENTE FOOTER */}
             <Footer abaAtiva={abaAtiva} setAbaAtiva={setAbaAtiva} />
 
+            {/* AÇÕES DOS MATERIAIS SELECIONADOS, FIXAS ACIMA DO RODAPÉ */}
+            {abaAtiva === 'Materiais' && modoSelecao && (
+                <View style={styles.selectionBar}>
+                    <View style={styles.selectionBarHeader}>
+                        <Text style={styles.selectionBarCount}>
+                            {itensSelecionados.length} material(is) selecionado(s)
+                        </Text>
+                        <TouchableOpacity onPress={limparSelecao}>
+                            <Text style={styles.selectionBarCancel}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.selectionBarActions}>
+                        <TouchableOpacity
+                            style={[styles.selectionBarButton, styles.selectionBarButtonMove]}
+                            onPress={abrirMovimentacaoSelecionados}
+                        >
+                            <Text style={styles.selectionBarButtonText}>📦 Mover</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.selectionBarButton, styles.selectionBarButtonCautela]}
+                            onPress={abrirCautelaComMateriaisSelecionados}
+                        >
+                            <Text style={[styles.selectionBarButtonText, styles.selectionBarButtonTextDark]}>
+                                📝 Criar cautela
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
             {/* ========================================== */}
             {/* MODAL DE SELEÇÃO DE PERÍODO (WEB E MOBILE) */}
             {/* ========================================== */}
@@ -389,14 +429,14 @@ export default function MainContent() {
             {/* --- BOTÃO FLUTUANTE DA ABA LIVRO (MENU SPEED DIAL) --- */}
             {abaAtiva === 'Livro' && (
                 <MenuFlutuanteLivro
-                    onNovaCautela={() => setModalVisivel(true)}
+                    onNovaCautela={abrirNovaCautela}
                     onExportarPDF={abrirMenuExportacao}
                     onExcluirTodas={solicitarExclusaoTodas}
                 />
             )}
 
             {/* --- BOTÃO FLUTUANTE DA ABA MATERIAIS --- */}
-            {abaAtiva === 'Materiais' && (
+            {abaAtiva === 'Materiais' && !modoSelecao && (
                 <TouchableOpacity style={[styles.botaoFlutuanteBase, { right: 25 }]} onPress={() => setModalTipoAdicaoVisivel(true)}>
                     <Text style={styles.botaoFlutuanteTexto}>+</Text>
                 </TouchableOpacity>

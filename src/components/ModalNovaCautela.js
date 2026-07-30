@@ -19,10 +19,31 @@ export default function ModalNovaCautela({
       Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
       return false;
     }
-    if (!materiaisCautela.some(m => m.nome.trim() !== '' && m.quantidade.trim() !== '')) {
+    if (!materiaisCautela.some(
+      m => String(m?.nome ?? '').trim() !== '' && String(m?.quantidade ?? '').trim() !== ''
+    )) {
       Alert.alert('Atenção', 'Adicione ao menos um material com quantidade.');
       return false;
     }
+
+    for (const material of materiaisCautela.filter(m => String(m?.nome ?? '').trim() !== '')) {
+      const quantidade = Number(material.quantidade);
+      if (!Number.isFinite(quantidade) || quantidade <= 0) {
+        Alert.alert('Atenção', `Informe uma quantidade válida para "${material.nome}".`);
+        return false;
+      }
+      if (
+        material.estoqueDisponivel !== undefined &&
+        quantidade > Number(material.estoqueDisponivel)
+      ) {
+        Alert.alert(
+          'Quantidade indisponível',
+          `Há somente ${material.estoqueDisponivel} unidade(s) de "${material.nome}" no estoque.`
+        );
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -87,26 +108,34 @@ export default function ModalNovaCautela({
 
               {/* 🔥 Lista de materiais: agora é possível cautelar mais de um item de uma vez */}
               {materiaisCautela.map((item, index) => (
-                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <TextInput
-                    style={[styles.input, { flex: 2, marginRight: 8, marginBottom: 0 }]}
-                    placeholder="Material"
-                    placeholderTextColor="#64748B"
-                    value={item.nome}
-                    onChangeText={(v) => atualizarLinhaMaterial(index, 'nome', v)}
-                  />
-                  <TextInput
-                    style={[styles.input, { flex: 1, marginRight: 8, marginBottom: 0 }]}
-                    placeholder="Qtd"
-                    placeholderTextColor="#64748B"
-                    keyboardType="numeric"
-                    value={item.quantidade}
-                    onChangeText={(v) => atualizarLinhaMaterial(index, 'quantidade', v)}
-                  />
-                  {materiaisCautela.length > 1 && (
-                    <TouchableOpacity onPress={() => removerLinhaMaterial(index)} style={{ padding: 6 }}>
-                      <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700' }}>✕</Text>
-                    </TouchableOpacity>
+                <View key={`${item.materialId || 'manual'}-${index}`} style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TextInput
+                      style={[styles.input, { flex: 2, marginRight: 8, marginBottom: 0 }]}
+                      placeholder="Material"
+                      placeholderTextColor="#64748B"
+                      value={item.nome}
+                      onChangeText={(v) => atualizarLinhaMaterial(index, 'nome', v)}
+                    />
+                    <TextInput
+                      style={[styles.input, { flex: 1, marginRight: 8, marginBottom: 0 }]}
+                      placeholder="Qtd"
+                      placeholderTextColor="#64748B"
+                      keyboardType="numeric"
+                      value={item.quantidade}
+                      onChangeText={(v) => atualizarLinhaMaterial(index, 'quantidade', v)}
+                    />
+                    {materiaisCautela.length > 1 && (
+                      <TouchableOpacity onPress={() => removerLinhaMaterial(index)} style={{ padding: 6 }}>
+                        <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700' }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {item.materialId && (
+                    <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 5, marginLeft: 3 }}>
+                      📍 {item.caminhoExibicao || 'Início'} • Disponível: {item.estoqueDisponivel}
+                    </Text>
                   )}
                 </View>
               ))}
