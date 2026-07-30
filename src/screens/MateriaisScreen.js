@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, StyleSheet } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
@@ -6,6 +6,8 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
   confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao, modalEditarPastaVisivel, setModalEditarPastaVisivel, nomeEdicaoPasta, setNomeEdicaoPasta, salvarEdicaoPasta, modoSelecao, itensSelecionados,
   modalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
   pastaSendoMovida, ativarModoSelecao, toggleSelecao, confirmarMovimentacao, cancelarMovimentacao, todasAsPastas }) {
+  const [materialExpandidoId, setMaterialExpandidoId] = useState(null);
+
   return (
     <View style={styles.secaoContainer}>
       <Text style={styles.tituloSecao}>RESERVA DE MATERIAIS</Text>
@@ -70,45 +72,112 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
 
       {itensExibicao.map((item) => {
         const selecionado = itensSelecionados.includes(item.id);
+        const expandido = !modoSelecao && materialExpandidoId === item.id;
+        const cautelasAtivas = Array.isArray(item.cautelasAtivas) ? item.cautelasAtivas : [];
+        const quantidadeCautelada = cautelasAtivas.reduce(
+          (total, cautela) => total + Number(cautela.quantidade || 0),
+          0
+        );
+        const possuiRegistroAnterior = cautelasAtivas.some(
+          cautela => cautela.possuiRegistroAnterior
+        );
 
         return (
-          <TouchableOpacity
+          <View
             key={item.id}
             style={[
               styles.nestItem,
+              styles.materialCard,
               selecionado && { borderColor: '#D4A25F', borderWidth: 1, backgroundColor: '#1E293B' } // Destaque visual
             ]}
-            // Se segurar, ativa a seleção. Se já estiver em modo de seleção, um clique normal marca/desmarca.
-            onLongPress={() => ativarModoSelecao(item.id)}
-            onPress={() => modoSelecao ? toggleSelecao(item.id) : null}
-            delayLongPress={400}
-            activeOpacity={0.7}
           >
-            <View style={[styles.nestIconContainer, { backgroundColor: selecionado ? '#D4A25F' : '#475569' }]}>
-              <Text style={styles.nestIcon}>{selecionado ? '✓' : '📄'}</Text>
-            </View>
-            <View style={styles.nestItemBody}>
-              <Text style={styles.nestTitle}>{item.item}</Text>
-              <Text style={styles.nestSubtitle}>Qtd: {item.quantidade} | {item.observacao || 'Sem obs'}</Text>
-              {pesquisaMateriais.trim() !== '' && item.caminhoExibicao && (
-                <Text style={styles.nestSubtitle}>📍 {item.caminhoExibicao}</Text>
+            <View style={styles.materialCardHeader}>
+              <TouchableOpacity
+                style={styles.materialCardMain}
+                onLongPress={() => {
+                  setMaterialExpandidoId(null);
+                  ativarModoSelecao(item.id);
+                }}
+                onPress={() => {
+                  if (modoSelecao) {
+                    toggleSelecao(item.id);
+                  } else {
+                    setMaterialExpandidoId(atual => atual === item.id ? null : item.id);
+                  }
+                }}
+                delayLongPress={400}
+                activeOpacity={0.7}
+                accessibilityLabel={`${item.item}. Disponível: ${item.quantidade}. Toque para ver detalhes.`}
+              >
+                <View style={[styles.nestIconContainer, { backgroundColor: selecionado ? '#D4A25F' : '#475569' }]}>
+                  <Text style={styles.nestIcon}>{selecionado ? '✓' : '📄'}</Text>
+                </View>
+                <View style={styles.nestItemBody}>
+                  <Text style={styles.nestTitle}>{item.item}</Text>
+                  <Text style={styles.nestSubtitle}>
+                    Disponível: {item.quantidade} | {item.observacao || 'Sem obs'}
+                  </Text>
+                  {pesquisaMateriais.trim() !== '' && item.caminhoExibicao && (
+                    <Text style={styles.nestSubtitle}>📍 {item.caminhoExibicao}</Text>
+                  )}
+                </View>
+                {!modoSelecao && (
+                  <Text style={styles.materialExpandIcon}>{expandido ? '⌃' : '⌄'}</Text>
+                )}
+              </TouchableOpacity>
+
+              {!modoSelecao && (
+                <TouchableOpacity
+                  style={styles.nestMenuBtn}
+                  onPress={(event) => {
+                    event.stopPropagation?.();
+                    abrirOpcoesItem(item);
+                  }}
+                  hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                >
+                  <Text style={styles.nestMenuText}>⋮</Text>
+                </TouchableOpacity>
               )}
             </View>
 
-            {/* Esconde o menu de 3 pontinhos se estiver no modo de seleção */}
-            {!modoSelecao && (
-              <TouchableOpacity
-                style={styles.nestMenuBtn}
-                onPress={(event) => {
-                  event.stopPropagation?.();
-                  abrirOpcoesItem(item);
-                }}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
-                <Text style={styles.nestMenuText}>⋮</Text>
-              </TouchableOpacity>
+            {expandido && (
+              <View style={styles.materialDetails}>
+                <View style={styles.materialSummaryRow}>
+                  <View style={styles.materialSummaryBox}>
+                    <Text style={styles.materialSummaryLabel}>DISPONÍVEL</Text>
+                    <Text style={styles.materialSummaryAvailable}>{item.quantidade}</Text>
+                  </View>
+                  <View style={styles.materialSummaryBox}>
+                    <Text style={styles.materialSummaryLabel}>CAUTELADOS</Text>
+                    <Text style={styles.materialSummaryReserved}>{quantidadeCautelada}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.materialDetailsTitle}>Cautelados:</Text>
+                {cautelasAtivas.length === 0 ? (
+                  <Text style={styles.materialEmptyText}>Nenhuma cautela ativa para este material.</Text>
+                ) : (
+                  cautelasAtivas.map((cautela, index) => (
+                    <View key={`${cautela.militar}-${index}`} style={styles.materialCautelaRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.materialCautelaMilitar}>{cautela.militar}</Text>
+                        {!!cautela.om && (
+                          <Text style={styles.materialCautelaOm}>{cautela.om}</Text>
+                        )}
+                      </View>
+                      <Text style={styles.materialCautelaQtd}>Qtd: {cautela.quantidade}</Text>
+                    </View>
+                  ))
+                )}
+
+                {possuiRegistroAnterior && (
+                  <Text style={styles.materialLegacyWarning}>
+                    ⚠ Há cautela anterior à integração do estoque; confira se o saldo já havia sido ajustado manualmente.
+                  </Text>
+                )}
+              </View>
             )}
-          </TouchableOpacity>
+          </View>
         );
       })}
 

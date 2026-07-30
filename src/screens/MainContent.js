@@ -96,7 +96,7 @@ export default function MainContent() {
         ativarModoSelecao, toggleSelecao, limparSelecao,
         obterMateriaisSelecionadosParaCautela, abrirMovimentacaoSelecionados,
         confirmarMovimentacao, cancelarMovimentacao, todasAsPastas
-    } = useMateriais();
+    } = useMateriais(listaCautelas);
 
     const abrirCautelaComMateriaisSelecionados = () => {
         const materiaisSelecionados = obterMateriaisSelecionadosParaCautela();

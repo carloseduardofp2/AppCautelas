@@ -51,7 +51,7 @@ function compararTextos(a, b) {
 // Reserva de Materiais: sincronização, navegação hierárquica e movimentação.
 // "path" é o formato principal. localizacao/subLocalizacao continuam sendo
 // gravados para manter compatibilidade com telas, relatórios e dados antigos.
-export function useMateriais() {
+export function useMateriais(listaCautelas = []) {
     const [listaMateriais, setListaMateriais] = useState([]);
     const [pesquisaMateriais, setPesquisaMateriais] = useState('');
     const [caminhoMateriais, setCaminhoMateriais] = useState([]);
@@ -110,6 +110,56 @@ export function useMateriais() {
 
         return () => unsubscribeMateriais();
     }, []);
+
+    function obterCautelasAtivasDoMaterial(materialId) {
+        const porMilitar = new Map();
+
+        listaCautelas
+            .filter(cautela => !String(cautela?.dataEntrega || '').trim())
+            .forEach(cautela => {
+                if (!Array.isArray(cautela.materiais)) return;
+
+                const quantidadeNaCautela = cautela.materiais
+                    .filter(material => material?.materialId === materialId)
+                    .reduce((total, material) => {
+                        const quantidade = Number(material.quantidade);
+                        return total + (Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 0);
+                    }, 0);
+
+                if (quantidadeNaCautela <= 0) return;
+
+                const militar = String(cautela.militar || 'Militar não informado').trim();
+                const chave = removerAcentos(militar);
+                const atual = porMilitar.get(chave);
+
+                if (atual) {
+                    atual.quantidade += quantidadeNaCautela;
+                    atual.possuiRegistroAnterior =
+                        atual.possuiRegistroAnterior || cautela.estoqueBaixado !== true;
+                } else {
+                    porMilitar.set(chave, {
+                        militar,
+                        om: cautela.om || '',
+                        quantidade: quantidadeNaCautela,
+                        possuiRegistroAnterior: cautela.estoqueBaixado !== true
+                    });
+                }
+            });
+
+        return [...porMilitar.values()].sort((a, b) => compararTextos(a.militar, b.militar));
+    }
+
+    function enriquecerMaterial(registro) {
+        const cautelasAtivas = obterCautelasAtivasDoMaterial(registro.id);
+        return {
+            ...registro,
+            cautelasAtivas,
+            quantidadeCauteladaAtiva: cautelasAtivas.reduce(
+                (total, cautela) => total + cautela.quantidade,
+                0
+            )
+        };
+    }
 
     function listarCaminhosDePastas(registros = listaMateriais) {
         const pastas = new Map();
@@ -231,6 +281,8 @@ export function useMateriais() {
                 isFolder: false,
                 item: matNome.trim(),
                 quantidade,
+                quantidadeCautelada: 0,
+                quantidadeTotal: quantidade,
                 observacao: matObs.trim()
             });
 
@@ -323,6 +375,8 @@ export function useMateriais() {
             editMatSubLocal,
             caminhoEdicaoOriginal
         );
+        const materialAtual = listaMateriais.find(material => material.id === idMaterialEditando);
+        const quantidadeCautelada = Number(materialAtual?.quantidadeCautelada) || 0;
 
         try {
             await updateDoc(doc(db, 'materiais', idMaterialEditando), {
@@ -331,6 +385,8 @@ export function useMateriais() {
                 isFolder: false,
                 item: editMatNome.trim(),
                 quantidade,
+                quantidadeCautelada,
+                quantidadeTotal: quantidade + quantidadeCautelada,
                 observacao: editMatObs.trim()
             });
 
@@ -436,6 +492,23 @@ export function useMateriais() {
 
         setTimeout(() => {
             if (item.tipo === 'pasta') {
+                const materiaisCautelados = listaMateriais.filter(registro =>
+                    !registro.isFolder &&
+                    caminhoEhPrefixo(item.dados.path, obterCaminhoRegistro(registro)) &&
+                    obterCautelasAtivasDoMaterial(registro.id).length > 0
+                );
+
+                if (materiaisCautelados.length > 0) {
+                    Alert.alert(
+                        'Prateleira em uso',
+                        `Não é possível excluir esta prateleira porque há material cautelado: ${materiaisCautelados
+                            .slice(0, 3)
+                            .map(material => material.item)
+                            .join(', ')}${materiaisCautelados.length > 3 ? '...' : ''}.`
+                    );
+                    return;
+                }
+
                 setDadosConfirmacao({
                     titulo: 'Excluir Prateleira',
                     msg: `Tem certeza que deseja excluir "${item.dados.nome}", suas prateleiras internas e TODOS os materiais guardados nelas?`,
@@ -445,6 +518,14 @@ export function useMateriais() {
                     }
                 });
             } else {
+                if (obterCautelasAtivasDoMaterial(item.dados.id).length > 0) {
+                    Alert.alert(
+                        'Material cautelado',
+                        'Dê baixa ou exclua a cautela ativa antes de remover este material do estoque.'
+                    );
+                    return;
+                }
+
                 setDadosConfirmacao({
                     titulo: 'Remover do Estoque',
                     msg: `Deseja excluir permanentemente o item "${item.dados.item}"?`,
@@ -514,7 +595,7 @@ export function useMateriais() {
                 })
                 .sort((a, b) => compararTextos(a.item, b.item))
                 .map(registro => ({
-                    ...registro,
+                    ...enriquecerMaterial(registro),
                     caminhoExibicao: obterCaminhoRegistro(registro).join(SEPARADOR_CAMINHO) || 'Início'
                 }));
 
@@ -540,7 +621,8 @@ export function useMateriais() {
                 !registro.isFolder &&
                 caminhosIguais(obterCaminhoRegistro(registro), caminhoMateriais)
             )
-            .sort((a, b) => compararTextos(a.item, b.item));
+            .sort((a, b) => compararTextos(a.item, b.item))
+            .map(enriquecerMaterial);
 
         return { pastas, itens };
     }
