@@ -1,0 +1,37 @@
+Base GitHub: 85a2e2a3837276249d9fb733506c7e227fc19e4a
+Revisão sem fotos e sem Firebase Storage.
+
+.gitignore
+App.js
+docs/ARQUIVOS-ALTERADOS.txt
+docs/ATUALIZACAO-2026-10-02.md
+firebase.test.json
+package-lock.json
+package.json
+src/components/CampoData.js
+src/components/Header.js
+src/components/MenuFlutuanteLivro.js
+src/components/ModalAssinatura.js
+src/components/ModalGerenciarCautela.js
+src/components/ModalMaterial.js
+src/components/ModalNovaCautela.js
+src/components/SeletorEstoque.js
+src/hooks/useCautelas.js
+src/hooks/useMateriais.js
+src/screens/LivroScreen.js
+src/screens/MainContent.js
+src/screens/MateriaisScreen.js
+src/screens/PendentesScreen.js
+src/services/cautelaService.js
+src/services/firebaseConfig.js
+src/services/pdfService.js
+src/styles/MainStyles.js
+src/utils/avisar.js
+src/utils/estoque.mjs
+src/utils/ordenacao.mjs
+src/utils/pdfHtml.mjs
+tests/build-test.mjs
+tests/e2e.mjs
+tests/estoque.test.mjs
+tests/firestore.fixture.rules
+tests/integracao.test.mjs

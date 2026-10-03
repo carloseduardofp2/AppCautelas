@@ -57,7 +57,7 @@ export default function MenuFlutuanteLivro({ onNovaCautela, onExportarPDF, onExc
 
                 <View style={styles.fabItemContainer}>
                     <Text style={styles.fabLabel}>Nova Cautela</Text>
-                    <TouchableOpacity style={styles.miniFab} onPress={() => { toggleMenu(); onNovaCautela(); }}>
+                    <TouchableOpacity accessibilityLabel="Nova cautela" style={styles.miniFab} onPress={() => { toggleMenu(); onNovaCautela(); }}>
                         <Text style={styles.miniFabIcon}>➕</Text>
                     </TouchableOpacity>
                 </View>
@@ -101,6 +101,7 @@ export default function MenuFlutuanteLivro({ onNovaCautela, onExportarPDF, onExc
             >
                 <TouchableOpacity
                     style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                    accessibilityLabel="Abrir ações do Livro"
                     onPress={toggleMenu}
                     activeOpacity={0.8}
                 >

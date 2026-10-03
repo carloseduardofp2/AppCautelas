@@ -74,10 +74,12 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
         const selecionado = itensSelecionados.includes(item.id);
         const expandido = !modoSelecao && materialExpandidoId === item.id;
         const cautelasAtivas = Array.isArray(item.cautelasAtivas) ? item.cautelasAtivas : [];
-        const quantidadeCautelada = cautelasAtivas.reduce(
+        const quantidadePendenteListada = cautelasAtivas.reduce(
           (total, cautela) => total + Number(cautela.quantidade || 0),
           0
         );
+        const quantidadeCautelada = Number(item.quantidadeCautelada || 0);
+        const divergente = quantidadePendenteListada !== quantidadeCautelada || Number(item.quantidadeTotal ?? Number(item.quantidade) + quantidadeCautelada) !== Number(item.quantidade) + quantidadeCautelada;
         const possuiRegistroAnterior = cautelasAtivas.some(
           cautela => cautela.possuiRegistroAnterior
         );
@@ -142,6 +144,9 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
 
             {expandido && (
               <View style={styles.materialDetails}>
+                <Text style={styles.cartaoTexto}>Local: {item.caminhoExibicao || (item.path || []).join(" › ") || "Início"}</Text>
+                <Text style={styles.cartaoTexto}>Total: {item.quantidadeTotal ?? Number(item.quantidade) + quantidadeCautelada}</Text>
+                {divergente && <Text style={styles.materialLegacyWarning}>Saldos requerem conferência: as cautelas abertas indicam {quantidadePendenteListada} unidade(s). Não será feita correção automática de registros antigos.</Text>}
                 <View style={styles.materialSummaryRow}>
                   <View style={styles.materialSummaryBox}>
                     <Text style={styles.materialSummaryLabel}>DISPONÍVEL</Text>

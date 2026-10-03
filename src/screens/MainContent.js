@@ -1,12 +1,13 @@
 import React, { useState, createElement } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar, Text, TouchableOpacity, ScrollView, Modal, View, Platform } from 'react-native';
+import { StatusBar, Text, TouchableOpacity, ScrollView, Modal, View, Platform, TextInput } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { styles } from '../styles/MainStyles';
 import { useCautelas } from '../hooks/useCautelas';
 import { useMateriais } from '../hooks/useMateriais';
 
+import ModalGerenciarCautela from '../components/ModalGerenciarCautela';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ModalNovaCautela from '../components/ModalNovaCautela';
@@ -21,10 +22,12 @@ import MateriaisScreen from './MateriaisScreen';
 export default function MainContent() {
     // --- ESTADO DE NAVEGAÇÃO (única coisa que continua "geral") ---
     const [abaAtiva, setAbaAtiva] = useState('Livro');
+    const [gerenciar, setGerenciar] = useState(null);
+    const abrirGerenciar = (cautela, modo) => setGerenciar({ cautela, modo });
 
     // --- TUDO relacionado ao Livro de Cautelas vive no hook abaixo ---
     const {
-        listaCautelas, isExportando,
+        listaCautelas, isExportando, previsaoDevolucao, setPrevisaoDevolucao, selecionarMaterial, exportarComHistorico,
         pesquisa, setPesquisa,
         modalVisivel, setModalVisivel,
         abrirNovaCautela, fecharNovaCautela, iniciarCautelaComMateriais,
@@ -56,11 +59,12 @@ export default function MainContent() {
         cautelasPendentes,
         modalExportacaoVisivel, setModalExportacaoVisivel,
         exportarTodas, abrirSelecaoPeriodo,
-        modalConfirmacaoCautela, setModalConfirmacaoCautela, dadosConfirmacaoCautela
+        modalConfirmacaoCautela, setModalConfirmacaoCautela, dadosConfirmacaoCautela, responsavelExclusao, setResponsavelExclusao
     } = useCautelas();
 
     // --- TUDO relacionado à Reserva de Materiais vive neste outro hook ---
     const {
+        listaMateriais, salvandoMaterial,
         pesquisaMateriais, setPesquisaMateriais,
         caminhoMateriais, setCaminhoMateriais,
         modalMateriaisVisivel, setModalMateriaisVisivel,
@@ -129,11 +133,11 @@ export default function MainContent() {
                 )}
 
                 {abaAtiva === 'Livro' && (
-                    <LivroScreen
+                    <LivroScreen abrirGerenciar={abrirGerenciar}
                         pesquisa={pesquisa}
                         setPesquisa={setPesquisa}
                         cautelasFiltradas={cautelasFiltradas}
-                        solicitarExclusao={solicitarExclusao}
+                        solicitarExclusao={c => abrirGerenciar(c, "excluir")}
                         setIdCautelaParaAssinar={setIdCautelaParaAssinar}
                         setTipoOperacao={setTipoOperacao}
                         setModalAssinatura={setModalAssinatura}
@@ -141,7 +145,7 @@ export default function MainContent() {
                 )}
 
                 {abaAtiva === 'Pendentes' && (
-                    <PendentesScreen
+                    <PendentesScreen abrirGerenciar={abrirGerenciar}
                         cautelasPendentes={cautelasPendentes}
                         setIdCautelaParaAssinar={setIdCautelaParaAssinar}
                         setTipoOperacao={setTipoOperacao}
@@ -196,6 +200,8 @@ export default function MainContent() {
             {/* --- INSERÇÃO DOS MODAIS --- */}
             {modalVisivel && (
                 <ModalNovaCautela
+                    previsaoDevolucao={previsaoDevolucao} setPrevisaoDevolucao={setPrevisaoDevolucao}
+                    estoque={listaMateriais} selecionarMaterial={selecionarMaterial}
                     fechar={fecharNovaCautela}
                     novoMilitar={novoMilitar} setNovoMilitar={setNovoMilitar}
                     novaOm={novaOm} setNovaOm={setNovaOm}
@@ -264,6 +270,7 @@ export default function MainContent() {
             )}
 
             <ModalMaterial
+                salvandoMaterial={salvandoMaterial}
                 modalMateriaisVisivel={modalMateriaisVisivel} setModalMateriaisVisivel={setModalMateriaisVisivel}
                 matLocal={matLocal} setMatLocal={setMatLocal}
                 matSubLocal={matSubLocal} setMatSubLocal={setMatSubLocal}
@@ -296,6 +303,7 @@ export default function MainContent() {
                 <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>{dadosConfirmacaoCautela.titulo}</Text>
+                        <TextInput accessibilityLabel="Responsável pela exclusão" style={styles.input} placeholder="Militar da SecOp responsável" placeholderTextColor="#94A3B8" value={responsavelExclusao} onChangeText={setResponsavelExclusao} />
                         <Text style={{ color: '#E2E8F0', fontSize: 16, textAlign: 'center', marginBottom: 25 }}>
                             {dadosConfirmacaoCautela.msg}
                         </Text>
@@ -311,6 +319,7 @@ export default function MainContent() {
                 </View>
             </Modal>
 
+            {gerenciar && <ModalGerenciarCautela cautela={gerenciar.cautela} modo={gerenciar.modo} estoque={listaMateriais} fechar={() => setGerenciar(null)} exportar={exportarComHistorico} />}
             {/* COMPONENTE FOOTER */}
             <Footer abaAtiva={abaAtiva} setAbaAtiva={setAbaAtiva} />
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
-export default function PendentesScreen({ cautelasPendentes, setIdCautelaParaAssinar, setTipoOperacao, setModalAssinatura }) {
+export default function PendentesScreen({ abrirGerenciar, cautelasPendentes, setIdCautelaParaAssinar, setTipoOperacao, setModalAssinatura }) {
   return (
     <View style={styles.secaoContainer}>
       <Text style={styles.tituloSecao}>MATERIAIS PENDENTES</Text>
@@ -26,13 +26,9 @@ export default function PendentesScreen({ cautelasPendentes, setIdCautelaParaAss
 
             <TouchableOpacity
               style={styles.btnBaixa}
-              onPress={() => {
-                setTipoOperacao('baixa');
-                setIdCautelaParaAssinar(cautela.id);
-                setModalAssinatura(true);
-              }}
+              onPress={() => abrirGerenciar(cautela, cautela.dataEntrega ? 'assinar_devolucao' : 'devolver')}
               >
-              <Text style={styles.btnBaixaTexto}>Assinar Devolução</Text>
+              <Text style={styles.btnBaixaTexto}>{cautela.dataEntrega ? 'Colher assinatura de devolução pendente' : 'Selecionar devolução / detalhes'}</Text>
             </TouchableOpacity>
           </View>
         ))

@@ -1,9 +1,11 @@
+import { avisar } from '../utils/avisar';
 import { useState, useRef, useEffect } from 'react';
-import { Alert } from 'react-native';
-import { db } from '../services/firebaseConfig';
-import { collection, onSnapshot, updateDoc, doc, query, runTransaction } from 'firebase/firestore';
+import { Alert, Platform } from 'react-native';
+import { auth, db } from '../services/firebaseConfig';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 import { removerAcentos } from '../utils/formatters';
 import { exportarParaPDF } from '../services/pdfService';
+import { salvarMovimentacao, novaOperacaoId, carregarHistorico } from '../services/cautelaService';
 
 // 🔥 Função única de conversão de data "dd/mm/aaaa" -> timestamp.
 // Antes essa mesma lógica estava duplicada (ordenação e filtro de período),
@@ -15,61 +17,6 @@ function converterDataBR(dataString) {
     if (partes.length !== 3) return 0;
     const dataObj = new Date(partes[2], partes[1] - 1, partes[0]);
     return isNaN(dataObj.getTime()) ? 0 : dataObj.getTime();
-}
-
-function obterMateriaisVinculados(cautela) {
-    if (!Array.isArray(cautela?.materiais)) return [];
-
-    return cautela.materiais
-        .filter(material => material?.materialId)
-        .map(material => ({
-            materialId: material.materialId,
-            nome: String(material.nome || 'Material').trim(),
-            quantidade: Number(material.quantidade)
-        }))
-        .filter(material => Number.isFinite(material.quantidade) && material.quantidade > 0);
-}
-
-function agruparMateriaisVinculados(materiais) {
-    const grupos = new Map();
-
-    materiais.forEach(material => {
-        if (!material.materialId) return;
-        const atual = grupos.get(material.materialId);
-        if (atual) {
-            atual.quantidade += Number(material.quantidade);
-        } else {
-            grupos.set(material.materialId, {
-                materialId: material.materialId,
-                nome: material.nome,
-                quantidade: Number(material.quantidade)
-            });
-        }
-    });
-
-    return [...grupos.values()];
-}
-
-function normalizarMateriaisParaSalvar(materiais) {
-    return materiais.map(material => {
-        const linha = {
-            nome: String(material.nome || '').trim(),
-            quantidade: Number(material.quantidade)
-        };
-
-        if (material.materialId) {
-            linha.materialId = material.materialId;
-            linha.estoqueControlado = true;
-            if (Array.isArray(material.caminhoEstoque)) {
-                linha.caminhoEstoque = material.caminhoEstoque;
-            }
-            if (material.caminhoExibicao) {
-                linha.caminhoExibicao = material.caminhoExibicao;
-            }
-        }
-
-        return linha;
-    });
 }
 
 function mensagemErroEstoque(error, acaoPadrao) {
@@ -95,6 +42,9 @@ export function useCautelas() {
     const [pesquisa, setPesquisa] = useState('');
     const [avisoSemResultados, setAvisoSemResultados] = useState('');
 
+    const [responsavelExclusao, setResponsavelExclusao] = useState('');
+    const responsavelExclusaoRef = useRef('');
+    responsavelExclusaoRef.current = responsavelExclusao;
     const [modalConfirmacaoCautela, setModalConfirmacaoCautela] = useState(false);
     const [dadosConfirmacaoCautela, setDadosConfirmacaoCautela] = useState({ titulo: '', msg: '', acao: null });
 
@@ -104,12 +54,15 @@ export function useCautelas() {
     const [novaOm, setNovaOm] = useState('');
     // 🔥 Agora suporta múltiplos materiais numa mesma cautela (antes era 1 campo só).
     const [materiaisCautela, setMateriaisCautela] = useState([{ nome: '', quantidade: '' }]);
+    const [previsaoDevolucao, setPrevisaoDevolucao] = useState('');
+    const operacaoIdRef = useRef(null);
     const [novaObs, setNovaObs] = useState('');
     const [novoMilSecOpCautela, setNovoMilSecOpCautela] = useState('');
     const aoCriarCautelaRef = useRef(null);
     const operacaoEmAndamentoRef = useRef(false);
 
     const abrirNovaCautela = () => {
+        operacaoIdRef.current = novaOperacaoId(db);
         aoCriarCautelaRef.current = null;
         setModalVisivel(true);
     };
@@ -131,10 +84,11 @@ export function useCautelas() {
             : [];
 
         if (linhas.length === 0) {
-            Alert.alert('Atenção', 'Selecione pelo menos um material válido.');
+            avisar('Atenção', 'Selecione pelo menos um material válido.');
             return false;
         }
 
+        operacaoIdRef.current = novaOperacaoId(db);
         setMateriaisCautela(linhas);
         aoCriarCautelaRef.current =
             typeof aoSalvarComSucesso === 'function' ? aoSalvarComSucesso : null;
@@ -201,10 +155,10 @@ export function useCautelas() {
             // Ordenação Cronológica (Mais recentes no topo)
             dados.sort((a, b) => converterDataBR(b.dataCautela) - converterDataBR(a.dataCautela));
 
-            setListaCautelas(dados);
+            setListaCautelas(dados.filter(c => !c.excluida));
         }, (error) => {
             console.error("Erro ao buscar Cautelas: ", error);
-            Alert.alert("Erro", "Não foi possível sincronizar as cautelas.");
+            avisar("Erro", "Não foi possível sincronizar as cautelas.");
         });
 
         return () => unsubscribeCautelas();
@@ -243,10 +197,10 @@ export function useCautelas() {
                 setModalConfirmacaoCautela(false);
                 try {
                     await excluirCautelaComEstoque(cautela.id);
-                    Alert.alert('Sucesso', 'Cautela excluída e estoque atualizado.');
+                    avisar('Sucesso', 'Cautela excluída e estoque atualizado.');
                 } catch (error) {
                     console.error(error);
-                    Alert.alert(
+                    avisar(
                         'Erro',
                         mensagemErroEstoque(error, 'Não foi possível excluir a cautela.')
                     );
@@ -266,10 +220,10 @@ export function useCautelas() {
                     for (const cautela of listaCautelas) {
                         await excluirCautelaComEstoque(cautela.id);
                     }
-                    Alert.alert('Sucesso', 'Todas as cautelas foram excluídas e o estoque foi atualizado.');
+                    avisar('Sucesso', 'Todas as cautelas foram excluídas e o estoque foi atualizado.');
                 } catch (error) {
                     console.error(error);
-                    Alert.alert(
+                    avisar(
                         'Erro',
                         mensagemErroEstoque(
                             error,
@@ -283,252 +237,54 @@ export function useCautelas() {
     };
 
     async function excluirCautelaComEstoque(cautelaId) {
-        await runTransaction(db, async transaction => {
-            const cautelaRef = doc(db, 'cautelas', cautelaId);
-            const cautelaSnapshot = await transaction.get(cautelaRef);
-            if (!cautelaSnapshot.exists()) return;
-
-            const cautela = cautelaSnapshot.data();
-            const deveRetornarEstoque =
-                !cautela.dataEntrega &&
-                cautela.estoqueBaixado === true &&
-                cautela.estoqueDevolvido !== true;
-            const materiais = deveRetornarEstoque
-                ? agruparMateriaisVinculados(obterMateriaisVinculados(cautela))
-                : [];
-            const snapshotsMateriais = [];
-
-            for (const material of materiais) {
-                const materialRef = doc(db, 'materiais', material.materialId);
-                const materialSnapshot = await transaction.get(materialRef);
-                if (!materialSnapshot.exists()) {
-                    throw new Error(`MATERIAL_INEXISTENTE|${material.nome}`);
-                }
-                snapshotsMateriais.push({ material, materialRef, materialSnapshot });
-            }
-
-            snapshotsMateriais.forEach(({ material, materialRef, materialSnapshot }) => {
-                const dados = materialSnapshot.data();
-                const disponivel = Number(dados.quantidade) || 0;
-                const cautelada = Number(dados.quantidadeCautelada) || 0;
-
-                transaction.update(materialRef, {
-                    quantidade: disponivel + material.quantidade,
-                    quantidadeCautelada: Math.max(0, cautelada - material.quantidade),
-                    quantidadeTotal: Number.isFinite(Number(dados.quantidadeTotal))
-                        ? Number(dados.quantidadeTotal)
-                        : disponivel + cautelada
-                });
-            });
-
-            transaction.delete(cautelaRef);
-        });
+        const operador = responsavelExclusaoRef.current.trim();
+        if (!operador) throw new Error('Informe o responsável pela exclusão no Livro.');
+        await salvarMovimentacao(db, { tipo: 'excluir', cautelaId, operacaoId: novaOperacaoId(db), operador,
+            uid: auth.currentUser?.uid, dataHoje: new Date().toLocaleDateString('pt-BR'), observacao: 'Exclusão solicitada no Livro' });
     }
 
     const handleAssinatura = async (signature, operacaoForcada = null) => {
         if (operacaoEmAndamentoRef.current) return;
         const operacao = operacaoForcada || tipoOperacao;
-
-        if (operacao === 'criar') {
-            // 🔥 Valida cada linha de material: nome preenchido e quantidade numérica > 0.
-            const materiaisValidos = materiaisCautela.filter(
-                m => String(m?.nome ?? '').trim() !== ''
-            );
-            if (materiaisValidos.length === 0) {
-                Alert.alert('Atenção', 'Adicione ao menos um material.');
-                return;
+        operacaoEmAndamentoRef.current = true;
+        try {
+            const id = operacaoIdRef.current || (operacaoIdRef.current = novaOperacaoId(db));
+            if (operacao === 'criar') {
+                await salvarMovimentacao(db, { tipo: 'criar', operacaoId: id,
+                    operador: novoMilSecOpCautela, uid: auth.currentUser?.uid, assinatura: signature,
+                    militar: novoMilitar, om: novaOm, observacao: novaObs, previsaoDevolucao,
+                    dataCautela: dataSelecionada.toLocaleDateString('pt-BR'),
+                    itens: materiaisCautela.filter(m => String(m.nome || '').trim()) });
+                setNovoMilitar(''); setNovaOm(''); setNovaObs(''); setPrevisaoDevolucao('');
+                setMateriaisCautela([{ nome: '', quantidade: '' }]); setNovoMilSecOpCautela('');
+                aoCriarCautelaRef.current?.(); aoCriarCautelaRef.current = null;
+            } else if (operacao === 'assinar_pendente') {
+                const c = listaCautelas.find(c => c.id === idCautelaParaAssinar);
+                await salvarMovimentacao(db, { tipo: 'assinar', operacaoId: id, cautelaId: idCautelaParaAssinar,
+                    operador: c?.milSecOpCautela || 'Responsável pela assinatura presencial', uid: auth.currentUser?.uid, assinatura: signature });
+            } else {
+                throw new Error('Abra a devolução pela aba Pendentes e selecione as quantidades.');
             }
-            for (const m of materiaisValidos) {
-                const quantidade = Number(m.quantidade);
-                if (!Number.isFinite(quantidade) || quantidade <= 0) {
-                    Alert.alert('Atenção', `Quantidade inválida para "${m.nome}". Informe um número maior que zero.`);
-                    return;
-                }
-                if (
-                    m.estoqueDisponivel !== undefined &&
-                    quantidade > Number(m.estoqueDisponivel)
-                ) {
-                    Alert.alert(
-                        'Quantidade indisponível',
-                        `Há somente ${m.estoqueDisponivel} unidade(s) de "${m.nome}" no estoque.`
-                    );
-                    return;
-                }
-            }
+            operacaoIdRef.current = null;
+            setModalAssinatura(false); setModalVisivel(false);
+            avisar('Sucesso', 'Registro salvo.');
+        } catch (error) {
+            avisar('Não foi possível salvar', error.message || 'Confira a conexão e tente novamente.');
+            if (operacao === 'criar') { setModalAssinatura(false); setModalVisivel(true); }
+        } finally { operacaoEmAndamentoRef.current = false; }
+    };
 
-            const materiaisNormalizados = normalizarMateriaisParaSalvar(materiaisValidos);
-            const materiaisVinculados = agruparMateriaisVinculados(materiaisNormalizados);
-            const novaCautela = {
-                militar: novoMilitar,
-                om: novaOm.trim() || 'Não informada',
-                // materiais: fonte de verdade (lista); material/quantidade: strings
-                // "resumo" mantidas por compatibilidade com telas antigas e busca.
-                materiais: materiaisNormalizados,
-                material: materiaisNormalizados.map(m => m.nome).join(', '),
-                quantidade: materiaisNormalizados.map(m => String(m.quantidade)).join(', '),
-                observacao: novaObs,
-                dataCautela: dataSelecionada.toLocaleDateString('pt-BR'),
-                milSecOpCautela: novoMilSecOpCautela,
-                assinaturaCautela: signature,
-                dataEntrega: '',
-                obsEntrega: '',
-                milSecOp: '',
-                assinaturaDevolucao: '',
-                estoqueBaixado: materiaisVinculados.length > 0,
-                estoqueDevolvido: false
-            };
-
-            operacaoEmAndamentoRef.current = true;
-            try {
-                const cautelaRef = doc(collection(db, 'cautelas'));
-
-                await runTransaction(db, async transaction => {
-                    const snapshotsMateriais = [];
-
-                    for (const material of materiaisVinculados) {
-                        const materialRef = doc(db, 'materiais', material.materialId);
-                        const materialSnapshot = await transaction.get(materialRef);
-                        if (!materialSnapshot.exists()) {
-                            throw new Error(`MATERIAL_INEXISTENTE|${material.nome}`);
-                        }
-                        snapshotsMateriais.push({ material, materialRef, materialSnapshot });
-                    }
-
-                    snapshotsMateriais.forEach(({ material, materialRef, materialSnapshot }) => {
-                        const dados = materialSnapshot.data();
-                        const disponivel = Number(dados.quantidade);
-
-                        if (!Number.isFinite(disponivel) || disponivel < material.quantidade) {
-                            throw new Error(
-                                `SALDO_INSUFICIENTE|${material.nome}|${Number.isFinite(disponivel) ? disponivel : 0}`
-                            );
-                        }
-
-                        const cautelada = Number(dados.quantidadeCautelada) || 0;
-                        transaction.update(materialRef, {
-                            quantidade: disponivel - material.quantidade,
-                            quantidadeCautelada: cautelada + material.quantidade,
-                            quantidadeTotal: Number.isFinite(Number(dados.quantidadeTotal))
-                                ? Number(dados.quantidadeTotal)
-                                : disponivel + cautelada
-                        });
-                    });
-
-                    transaction.set(cautelaRef, novaCautela);
-                });
-
-                setModalAssinatura(false);
-                setNovoMilitar(''); setNovaOm(''); setMateriaisCautela([{ nome: '', quantidade: '' }]); setNovaObs(''); setNovoMilSecOpCautela('');
-                const aoCriarCautela = aoCriarCautelaRef.current;
-                aoCriarCautelaRef.current = null;
-                aoCriarCautela?.();
-                Alert.alert("Sucesso", "Cautela registrada no sistema!");
-            } catch (error) {
-                console.error("Erro ao salvar cautela: ", error);
-                setModalAssinatura(false);
-                setModalVisivel(true);
-                Alert.alert(
-                    "Erro",
-                    mensagemErroEstoque(error, "Não foi possível salvar a cautela.")
-                );
-            } finally {
-                operacaoEmAndamentoRef.current = false;
-            }
-
-        } else if (operacao === 'assinar_pendente') {
-            operacaoEmAndamentoRef.current = true;
-            try {
-                const docRef = doc(db, 'cautelas', idCautelaParaAssinar);
-                await updateDoc(docRef, {
-                    assinaturaCautela: signature
-                });
-                setModalAssinatura(false);
-                Alert.alert("Sucesso", "Assinatura colhida com sucesso!");
-            } catch (error) {
-                console.error(error);
-                Alert.alert("Erro", "Falha ao salvar assinatura tardia.");
-            } finally {
-                operacaoEmAndamentoRef.current = false;
-            }
-
-        } else {
-            if (novoMilSecOp.trim() === '') {
-                Alert.alert("Atenção", "Informe qual militar da Sec Op está recebendo o material!");
-                return;
-            }
-            const dataHoje = new Date().toLocaleDateString('pt-BR');
-            operacaoEmAndamentoRef.current = true;
-            try {
-                const resultado = await runTransaction(db, async transaction => {
-                    const cautelaRef = doc(db, 'cautelas', idCautelaParaAssinar);
-                    const cautelaSnapshot = await transaction.get(cautelaRef);
-                    if (!cautelaSnapshot.exists()) throw new Error('CAUTELA_INEXISTENTE');
-
-                    const cautela = cautelaSnapshot.data();
-                    if (cautela.dataEntrega) return { jaBaixada: true };
-
-                    const deveRetornarEstoque =
-                        cautela.estoqueBaixado === true &&
-                        cautela.estoqueDevolvido !== true;
-                    const materiais = deveRetornarEstoque
-                        ? agruparMateriaisVinculados(obterMateriaisVinculados(cautela))
-                        : [];
-                    const snapshotsMateriais = [];
-
-                    for (const material of materiais) {
-                        const materialRef = doc(db, 'materiais', material.materialId);
-                        const materialSnapshot = await transaction.get(materialRef);
-                        if (!materialSnapshot.exists()) {
-                            throw new Error(`MATERIAL_INEXISTENTE|${material.nome}`);
-                        }
-                        snapshotsMateriais.push({ material, materialRef, materialSnapshot });
-                    }
-
-                    snapshotsMateriais.forEach(({ material, materialRef, materialSnapshot }) => {
-                        const dados = materialSnapshot.data();
-                        const disponivel = Number(dados.quantidade) || 0;
-                        const cautelada = Number(dados.quantidadeCautelada) || 0;
-
-                        transaction.update(materialRef, {
-                            quantidade: disponivel + material.quantidade,
-                            quantidadeCautelada: Math.max(0, cautelada - material.quantidade),
-                            quantidadeTotal: Number.isFinite(Number(dados.quantidadeTotal))
-                                ? Number(dados.quantidadeTotal)
-                                : disponivel + cautelada
-                        });
-                    });
-
-                    transaction.update(cautelaRef, {
-                        dataEntrega: dataHoje,
-                        obsEntrega: novaObsEntrega,
-                        milSecOp: novoMilSecOp,
-                        assinaturaDevolucao: signature,
-                        estoqueDevolvido: deveRetornarEstoque
-                    });
-
-                    return { jaBaixada: false };
-                });
-
-                if (resultado?.jaBaixada) {
-                    setModalAssinatura(false);
-                    Alert.alert("Atenção", "Esta cautela já recebeu baixa.");
-                    return;
-                }
-
-                setModalAssinatura(false);
-                setNovoMilSecOp('');
-                setNovaObsEntrega('');
-                Alert.alert("Sucesso", "Baixa realizada!");
-            } catch (error) {
-                console.error(error);
-                Alert.alert(
-                    "Erro",
-                    mensagemErroEstoque(error, "Não foi possível registrar a devolução.")
-                );
-            } finally {
-                operacaoEmAndamentoRef.current = false;
-            }
-        }
+    const exportarComHistorico = async lista => {
+        if (isExportando) return;
+        setIsExportando(true);
+        const janela = Platform.OS === 'web' ? window.open('', '_blank') : null;
+        if (janela) janela.document.body.textContent = 'Preparando o PDF com histórico…';
+        try {
+            const completos = [];
+            for (const c of lista) completos.push({ ...c, historico: await carregarHistorico(db, c.id) });
+            await exportarParaPDF(completos, false, setIsExportando, janela);
+        } catch (e) { janela?.close(); avisar('PDF não gerado', 'Não foi possível carregar o histórico completo. Confira a conexão.'); }
+        finally { setIsExportando(false); }
     };
 
     const abrirMenuExportacao = () => {
@@ -537,7 +293,7 @@ export function useCautelas() {
 
     const exportarTodas = () => {
         setModalExportacaoVisivel(false);
-        exportarParaPDF(listaCautelas, isExportando, setIsExportando);
+        exportarComHistorico(listaCautelas);
     };
 
     const abrirSelecaoPeriodo = () => {
@@ -558,11 +314,11 @@ export function useCautelas() {
         if (filtradas.length === 0) {
             // Em vez do Alert, define a mensagem e faz ela sumir após 4 segundos
             setAvisoSemResultados("Nenhuma cautela encontrada neste período.");
-            setTimeout(() => setAvisoSemResultados(''), 4000); 
+            setTimeout(() => setAvisoSemResultados(''), 4000);
         } else {
             setAvisoSemResultados('');
-            exportarParaPDF(filtradas, isExportando, setIsExportando);
-        }   
+            exportarComHistorico(filtradas);
+        }
     };
 
     const cautelasFiltradas = listaCautelas.filter(cautela => {
@@ -578,13 +334,14 @@ export function useCautelas() {
     const cautelasPendentes = listaCautelas.filter(cautela => !cautela.dataEntrega || !cautela.assinaturaDevolucao);
 
     return {
-        listaCautelas, isExportando,
+        listaCautelas, isExportando, previsaoDevolucao, setPrevisaoDevolucao, exportarComHistorico,
         pesquisa, setPesquisa,
         modalVisivel, setModalVisivel,
         abrirNovaCautela, fecharNovaCautela, iniciarCautelaComMateriais,
         novoMilitar, setNovoMilitar,
         novaOm, setNovaOm,
         materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
+        selecionarMaterial: m => setMateriaisCautela(prev => [...prev.filter(i => i.nome.trim()), m]),
         novaObs, setNovaObs,
         novoMilSecOpCautela, setNovoMilSecOpCautela,
         tipoOperacao, setTipoOperacao,
@@ -603,7 +360,7 @@ export function useCautelas() {
         gerarRelatorioFiltrado,
         aoMudarData,
         solicitarExclusao, solicitarExclusaoTodas,
-        modalConfirmacaoCautela, setModalConfirmacaoCautela, 
+        modalConfirmacaoCautela, setModalConfirmacaoCautela, responsavelExclusao, setResponsavelExclusao,
         dadosConfirmacaoCautela,
         handleAssinatura,
         abrirMenuExportacao,

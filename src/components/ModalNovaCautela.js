@@ -1,10 +1,13 @@
+import { avisar } from '../utils/avisar';
 import React from 'react';
+import CampoData from './CampoData';
+import SeletorEstoque from './SeletorEstoque';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { styles } from '../styles/MainStyles';
 
 export default function ModalNovaCautela({
-  fechar,
+  fechar, previsaoDevolucao, setPrevisaoDevolucao, estoque, selecionarMaterial,
   novoMilitar, setNovoMilitar,
   novaOm, setNovaOm,
   materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
@@ -16,27 +19,27 @@ export default function ModalNovaCautela({
 }) {
   const validarCampos = () => {
     if (novoMilitar === '' || novoMilSecOpCautela === '') {
-      Alert.alert('Atenção', 'Preencha os campos obrigatórios!');
+      avisar('Atenção', 'Preencha os campos obrigatórios!');
       return false;
     }
     if (!materiaisCautela.some(
       m => String(m?.nome ?? '').trim() !== '' && String(m?.quantidade ?? '').trim() !== ''
     )) {
-      Alert.alert('Atenção', 'Adicione ao menos um material com quantidade.');
+      avisar('Atenção', 'Adicione ao menos um material com quantidade.');
       return false;
     }
 
     for (const material of materiaisCautela.filter(m => String(m?.nome ?? '').trim() !== '')) {
       const quantidade = Number(material.quantidade);
-      if (!Number.isFinite(quantidade) || quantidade <= 0) {
-        Alert.alert('Atenção', `Informe uma quantidade válida para "${material.nome}".`);
+      if (!Number.isSafeInteger(quantidade) || quantidade <= 0) {
+        avisar('Atenção', `Informe uma quantidade válida para "${material.nome}".`);
         return false;
       }
       if (
         material.estoqueDisponivel !== undefined &&
         quantidade > Number(material.estoqueDisponivel)
       ) {
-        Alert.alert(
+        avisar(
           'Quantidade indisponível',
           `Há somente ${material.estoqueDisponivel} unidade(s) de "${material.nome}" no estoque.`
         );
@@ -62,6 +65,8 @@ export default function ModalNovaCautela({
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>Nova Cautela</Text>
+              <CampoData value={previsaoDevolucao} onChange={setPrevisaoDevolucao} />
+              <SeletorEstoque materiais={estoque} onSelect={selecionarMaterial} />
 
               <TextInput
                 style={styles.input}
@@ -114,6 +119,7 @@ export default function ModalNovaCautela({
                       style={[styles.input, { flex: 2, marginRight: 8, marginBottom: 0 }]}
                       placeholder="Material"
                       placeholderTextColor="#64748B"
+                      editable={!item.materialId}
                       value={item.nome}
                       onChangeText={(v) => atualizarLinhaMaterial(index, 'nome', v)}
                     />
@@ -141,26 +147,10 @@ export default function ModalNovaCautela({
               ))}
 
               <TouchableOpacity onPress={adicionarLinhaMaterial} style={{ marginBottom: 15 }}>
-                <Text style={{ color: '#38BDF8', fontWeight: '600' }}>+ Adicionar material</Text>
+                <Text style={{ color: '#38BDF8', fontWeight: '600' }}>+ Adicionar material avulso (sem estoque)</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.input, { justifyContent: 'center' }]}
-                onPress={() => setMostrarCalendario(true)}
-              >
-                <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
-                  📅 {dataSelecionada.toLocaleDateString('pt-BR')}
-                </Text>
-              </TouchableOpacity>
-
-              {mostrarCalendario && (
-                <DateTimePicker
-                  value={dataSelecionada}
-                  mode="date"
-                  display="default"
-                  onChange={aoMudarData}
-                />
-              )}
+              <CampoData value={`${dataSelecionada.getFullYear()}-${String(dataSelecionada.getMonth()+1).padStart(2,'0')}-${String(dataSelecionada.getDate()).padStart(2,'0')}`} onChange={v => { if (v) aoMudarData({ type: 'set' }, new Date(`${v}T12:00:00`)); }} limpavel={false} label="Data da retirada" />
 
               <TextInput
                 style={[styles.input, styles.inputArea]}

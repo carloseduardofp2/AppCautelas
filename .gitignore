@@ -40,3 +40,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local validation artifacts
+dist-test/
+test-results/
+*-debug.log

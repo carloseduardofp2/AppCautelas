@@ -1,25 +1,28 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { auth } from './src/services/firebaseConfig';
 import { signInAnonymously } from 'firebase/auth';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MainContent from './src/screens/MainContent'; // Importando a tela principal
 
 export default function App() {
+  const [pronto, setPronto] = useState(false);
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
     // Tenta autenticar anonimamente ao abrir o aplicativo
     signInAnonymously(auth)
       .then(() => {
-        console.log('Autenticado anonimamente com sucesso!');
+        setPronto(true);
       })
       .catch((error) => {
-        console.error('Erro ao autenticar anonimamente:', error);
+        setErro('Não foi possível iniciar a sessão. Confira a conexão e recarregue o aplicativo.');
       });
   }, []);
 
   return (
     <SafeAreaProvider>
-      <MainContent />
+      {pronto ? <MainContent /> : <View style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', padding: 24 }}><Text style={{ color: '#fff' }}>{erro || 'Iniciando sessão…'}</Text>{!erro && <ActivityIndicator />}</View>}
     </SafeAreaProvider>
   );
 }

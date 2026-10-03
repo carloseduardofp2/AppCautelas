@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
-export default function ModalMaterial({
+export default function ModalMaterial({ salvandoMaterial,
   // Propriedades do Modal de Novo Material
   modalMateriaisVisivel,
   setModalMateriaisVisivel,
@@ -112,8 +112,8 @@ export default function ModalMaterial({
                     <Text style={styles.btnCancelarTexto}>Cancelar</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.btnSalvar} onPress={salvarNovoMaterial}>
-                    <Text style={styles.btnSalvarTexto}>Salvar Item</Text>
+                  <TouchableOpacity disabled={salvandoMaterial} style={styles.btnSalvar} onPress={salvarNovoMaterial}>
+                    <Text style={styles.btnSalvarTexto}>{salvandoMaterial ? 'Salvando…' : 'Salvar Item'}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -140,6 +140,7 @@ export default function ModalMaterial({
             <View style={styles.modalContent}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={styles.modalTitle}>Editar Item / Localização</Text>
+                <Text style={styles.cartaoTexto}>A quantidade abaixo é a disponível. O saldo cautelado será preservado.</Text>
 
                 <TextInput
                   style={styles.input}
@@ -192,8 +193,8 @@ export default function ModalMaterial({
                     <Text style={styles.btnCancelarTexto}>Cancelar</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.btnSalvar} onPress={salvarEdicaoMaterial}>
-                    <Text style={styles.btnSalvarTexto}>Salvar Alterações</Text>
+                  <TouchableOpacity disabled={salvandoMaterial} style={styles.btnSalvar} onPress={salvarEdicaoMaterial}>
+                    <Text style={styles.btnSalvarTexto}>{salvandoMaterial ? 'Salvando…' : 'Salvar Alterações'}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>

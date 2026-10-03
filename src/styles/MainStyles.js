@@ -38,8 +38,8 @@ export const styles = StyleSheet.create({
     cartao: { backgroundColor: '#1E293B', borderRadius: 8, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
     cartaoLinha: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     cartaoLinhaAfastada: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-    cartaoMilitar: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
-    cartaoQtd: { color: '#D4A25F', fontSize: 16, fontWeight: 'bold', position: 'absolute', right: 0, top: 32 },
+    cartaoMilitar: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', flex: 1 },
+    cartaoQtd: { color: '#D4A25F', fontSize: 14, fontWeight: 'bold', marginLeft: 8, flexShrink: 1 },
     cartaoTextoMaterial: { color: '#D4A25F', fontSize: 16, marginVertical: 2, fontWeight: '600' },
     cartaoTexto: { color: '#E2E8F0', fontSize: 14, marginVertical: 2 },
     labelMaterial: { color: '#D4A25F', fontSize: 16, fontWeight: '600' },
@@ -50,7 +50,7 @@ export const styles = StyleSheet.create({
     statusPendente: { color: '#F87171' },
     inputPesquisa: { backgroundColor: '#1E293B', color: '#FFFFFF', borderWidth: 1, borderColor: '#334155', borderRadius: 8, padding: 12, marginBottom: 20, fontSize: 16 },
     noResultsText: { color: '#94A3B8', fontSize: 16, textAlign: 'center', marginTop: 20 },
-    cartaoLinhaAfastadaActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+    cartaoLinhaAfastadaActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
     btnExcluir: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: '#7F1D1D', borderWidth: 1, borderColor: '#991B1B' },
     btnExcluirTexto: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
     btnBaixa: { backgroundColor: '#059669', padding: 12, borderRadius: 8, marginTop: 15, alignItems: 'center', borderWidth: 1, borderColor: '#047857' },
@@ -160,7 +160,7 @@ export const styles = StyleSheet.create({
         borderTopRightRadius: 20,
         borderWidth: 1,
         borderColor: '#334155',
-        maxHeight: '90%'
+        maxHeight: '90%', width: '100%', maxWidth: 850, alignSelf: 'center'
     },
 
     input: { backgroundColor: '#0F172A', color: '#FFFFFF', borderWidth: 1, borderColor: '#334155', borderRadius: 8, padding: 15, marginBottom: 15, fontSize: 16 },

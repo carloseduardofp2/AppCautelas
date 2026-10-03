@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { formatarPrevisao } from '../utils/estoque.mjs';
 import { styles } from '../styles/MainStyles';
 
-export default function LivroScreen({ pesquisa, setPesquisa, cautelasFiltradas, solicitarExclusao, setIdCautelaParaAssinar, setTipoOperacao, setModalAssinatura }) {
+export default function LivroScreen({ abrirGerenciar, pesquisa, setPesquisa, cautelasFiltradas, solicitarExclusao, setIdCautelaParaAssinar, setTipoOperacao, setModalAssinatura }) {
   return (
     <View style={styles.secaoContainer}>
       <Text style={styles.tituloSecao}>LIVRO DE CAUTELAS</Text>
@@ -40,6 +41,13 @@ export default function LivroScreen({ pesquisa, setPesquisa, cautelasFiltradas, 
             </Text>
           </View>
 
+          {!!cautela.previsaoDevolucao && <Text style={styles.cartaoTexto}>Previsão de devolução: {formatarPrevisao(cautela.previsaoDevolucao)}</Text>}
+          {!!cautela.totalAcrescimos && <Text style={[styles.cartaoTexto, { color: '#D4A25F' }]}>Acréscimos assinados: {cautela.totalAcrescimos}</Text>}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+            <TouchableOpacity style={styles.btnAssinarDepois} onPress={() => abrirGerenciar(cautela, 'detalhes')}><Text style={styles.btnAssinarDepoisTexto}>Detalhes / PDF</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.btnAssinarDepois} onPress={() => abrirGerenciar(cautela, 'editar')}><Text style={styles.btnAssinarDepoisTexto}>Editar</Text></TouchableOpacity>
+            {!cautela.dataEntrega && cautela.estoqueDevolvido !== true && !!cautela.assinaturaCautela && <TouchableOpacity style={styles.btnAssinarDepois} onPress={() => abrirGerenciar(cautela, 'adicionar')}><Text style={styles.btnAssinarDepoisTexto}>+ Material</Text></TouchableOpacity>}
+          </View>
           <View style={styles.divisor} />
 
           <Text style={styles.cartaoTexto}>

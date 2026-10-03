@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { avisar } from '../utils/avisar';
+import { useEffect, useState, useRef } from 'react';
 import { Alert } from 'react-native';
-import { db } from '../services/firebaseConfig';
+import { auth, db } from '../services/firebaseConfig';
 import {
-    addDoc,
+    addDoc, runTransaction, serverTimestamp,
     collection,
     doc,
     getDocs,
@@ -10,6 +11,8 @@ import {
     updateDoc,
     writeBatch
 } from 'firebase/firestore';
+import { itensCautela, inteiro } from '../utils/estoque.mjs';
+import { compararNatural } from '../utils/ordenacao.mjs';
 import { removerAcentos } from '../utils/formatters';
 
 const LOCAL_NAO_INFORMADO = 'Não informado';
@@ -42,10 +45,7 @@ function obterCamposLegados(caminho) {
 }
 
 function compararTextos(a, b) {
-    return removerAcentos(limparSegmento(a)).localeCompare(
-        removerAcentos(limparSegmento(b)),
-        'pt-BR'
-    );
+    return compararNatural(limparSegmento(a), limparSegmento(b));
 }
 
 // Reserva de Materiais: sincronização, navegação hierárquica e movimentação.
@@ -63,6 +63,10 @@ export function useMateriais(listaCautelas = []) {
     const [matNome, setMatNome] = useState('');
     const [matQtd, setMatQtd] = useState('');
     const [matObs, setMatObs] = useState('');
+    const [salvandoMaterial, setSalvandoMaterial] = useState(false);
+    const travaMaterial = useRef(false);
+    const materialEdicaoRef = useRef(null);
+    const novoMaterialId = useRef(null);
     const [caminhoCadastroPreferido, setCaminhoCadastroPreferido] = useState([]);
 
     // --- EDIÇÃO DE MATERIAIS ---
@@ -102,10 +106,10 @@ export function useMateriais(listaCautelas = []) {
                 id: documento.id,
                 ...documento.data()
             }));
-            setListaMateriais(dados);
+            setListaMateriais(dados.filter(m => !m.arquivado));
         }, (error) => {
             console.error('Erro ao buscar Materiais:', error);
-            Alert.alert('Erro', 'Não foi possível sincronizar a reserva de materiais.');
+            avisar('Erro', 'Não foi possível sincronizar a reserva de materiais.');
         });
 
         return () => unsubscribeMateriais();
@@ -118,11 +122,12 @@ export function useMateriais(listaCautelas = []) {
             .filter(cautela => !String(cautela?.dataEntrega || '').trim())
             .forEach(cautela => {
                 if (!Array.isArray(cautela.materiais)) return;
+                try { itensCautela(cautela); } catch { return; }
 
-                const quantidadeNaCautela = cautela.materiais
+                const quantidadeNaCautela = itensCautela(cautela)
                     .filter(material => material?.materialId === materialId)
                     .reduce((total, material) => {
-                        const quantidade = Number(material.quantidade);
+                        const quantidade = Number(material.pendente);
                         return total + (Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 0);
                     }, 0);
 
@@ -211,12 +216,12 @@ export function useMateriais(listaCautelas = []) {
         const nomeLimpo = limparSegmento(nome);
 
         if (!nomeLimpo) {
-            Alert.alert('Atenção', 'Digite o nome da prateleira/local.');
+            avisar('Atenção', 'Digite o nome da prateleira/local.');
             return null;
         }
 
         if (nomeLimpo.includes('›')) {
-            Alert.alert('Atenção', 'O nome da prateleira não pode conter o caractere "›".');
+            avisar('Atenção', 'O nome da prateleira não pode conter o caractere "›".');
             return null;
         }
 
@@ -248,7 +253,7 @@ export function useMateriais(listaCautelas = []) {
 
             grupo.forEach(({ id, dados, excluir }) => {
                 const referencia = doc(db, 'materiais', id);
-                if (excluir) lote.delete(referencia);
+                if (excluir) lote.update(referencia, { arquivado: true });
                 else lote.update(referencia, dados);
             });
 
@@ -258,13 +263,13 @@ export function useMateriais(listaCautelas = []) {
 
     async function salvarNovoMaterial() {
         if (!matNome.trim() || !matQtd.trim()) {
-            Alert.alert('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
+            avisar('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
             return;
         }
 
         const quantidade = Number(matQtd);
-        if (!Number.isFinite(quantidade) || quantidade < 0) {
-            Alert.alert('Atenção', 'Quantidade inválida. Informe um número válido.');
+        if (!Number.isSafeInteger(quantidade) || quantidade < 0) {
+            avisar('Atenção', 'Quantidade inválida. Informe um número válido.');
             return;
         }
 
@@ -274,30 +279,22 @@ export function useMateriais(listaCautelas = []) {
             caminhoCadastroPreferido
         );
 
+        if (travaMaterial.current) return;
+        travaMaterial.current = true; setSalvandoMaterial(true);
         try {
-            await addDoc(collection(db, 'materiais'), {
-                ...obterCamposLegados(caminho),
-                path: caminho,
-                isFolder: false,
-                item: matNome.trim(),
-                quantidade,
-                quantidadeCautelada: 0,
-                quantidadeTotal: quantidade,
-                observacao: matObs.trim()
+            const referencia = doc(db, 'materiais', novoMaterialId.current || (novoMaterialId.current = doc(collection(db, 'materiais')).id));
+            await runTransaction(db, async tx => {
+                const existente = await tx.get(referencia);
+                if (existente.exists()) return;
+                tx.set(referencia, { ...obterCamposLegados(caminho), path: caminho, isFolder: false,
+                    item: matNome.trim(), quantidade, quantidadeCautelada: 0, quantidadeTotal: quantidade,
+                    observacao: matObs.trim(), createdAt: serverTimestamp(), createdBy: auth.currentUser?.uid || '' });
             });
-
-            setMatLocal('');
-            setMatSubLocal('');
-            setMatNome('');
-            setMatQtd('');
-            setMatObs('');
-            setCaminhoCadastroPreferido([]);
+            setMatNome(''); setMatQtd(''); setMatObs(''); novoMaterialId.current = null;
             setModalMateriaisVisivel(false);
-            Alert.alert('Sucesso', 'Material adicionado ao estoque!');
-        } catch (error) {
-            console.error(error);
-            Alert.alert('Erro', 'Não foi possível cadastrar o material.');
-        }
+            avisar('Sucesso', 'Material adicionado ao estoque!');
+        } catch (error) { avisar('Erro ao salvar material', error.message); }
+        finally { travaMaterial.current = false; setSalvandoMaterial(false); }
     }
 
     async function salvarNovaPrateleira() {
@@ -305,7 +302,7 @@ export function useMateriais(listaCautelas = []) {
         if (!nome) return;
 
         if (pastaComMesmoNomeExiste(caminhoMateriais, nome)) {
-            Alert.alert('Atenção', 'Já existe uma prateleira com esse nome neste local.');
+            avisar('Atenção', 'Já existe uma prateleira com esse nome neste local.');
             return;
         }
 
@@ -325,7 +322,7 @@ export function useMateriais(listaCautelas = []) {
             setModalNovaPrateleiraVisivel(false);
         } catch (error) {
             console.error(error);
-            Alert.alert('Erro', 'Não foi possível criar a prateleira.');
+            avisar('Erro', 'Não foi possível criar a prateleira.');
         }
     }
 
@@ -340,6 +337,7 @@ export function useMateriais(listaCautelas = []) {
             setMatNome('');
             setMatQtd('');
             setMatObs('');
+
             setModalMateriaisVisivel(true);
         }, 250);
     }
@@ -348,6 +346,7 @@ export function useMateriais(listaCautelas = []) {
         const caminho = obterCaminhoRegistro(material);
         const campos = obterCamposLegados(caminho);
 
+        materialEdicaoRef.current = material;
         setIdMaterialEditando(material.id);
         setCaminhoEdicaoOriginal(caminho);
         setEditMatLocal(caminho.length ? campos.localizacao : '');
@@ -360,13 +359,13 @@ export function useMateriais(listaCautelas = []) {
 
     async function salvarEdicaoMaterial() {
         if (!editMatNome.trim() || !editMatQtd.trim()) {
-            Alert.alert('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
+            avisar('Atenção', 'Nome do Item e Quantidade são obrigatórios!');
             return;
         }
 
         const quantidade = Number(editMatQtd);
-        if (!Number.isFinite(quantidade) || quantidade < 0) {
-            Alert.alert('Atenção', 'Quantidade inválida. Informe um número válido.');
+        if (!Number.isSafeInteger(quantidade) || quantidade < 0) {
+            avisar('Atenção', 'Quantidade inválida. Informe um número válido.');
             return;
         }
 
@@ -375,29 +374,36 @@ export function useMateriais(listaCautelas = []) {
             editMatSubLocal,
             caminhoEdicaoOriginal
         );
-        const materialAtual = listaMateriais.find(material => material.id === idMaterialEditando);
-        const quantidadeCautelada = Number(materialAtual?.quantidadeCautelada) || 0;
-
+        if (travaMaterial.current) return;
+        travaMaterial.current = true; setSalvandoMaterial(true);
+        const original = materialEdicaoRef.current;
         try {
-            await updateDoc(doc(db, 'materiais', idMaterialEditando), {
-                ...obterCamposLegados(caminho),
-                path: caminho,
-                isFolder: false,
-                item: editMatNome.trim(),
-                quantidade,
-                quantidadeCautelada,
-                quantidadeTotal: quantidade + quantidadeCautelada,
-                observacao: editMatObs.trim()
+            const historicoRef = doc(collection(db, 'materiais', idMaterialEditando, 'historico'));
+            await runTransaction(db, async tx => {
+                const referencia = doc(db, 'materiais', idMaterialEditando);
+                const snapshot = await tx.get(referencia);
+                if (!snapshot.exists()) throw new Error('O material não existe mais.');
+                const atual = snapshot.data();
+                if (atual.arquivado) throw new Error('O material foi removido.');
+                for (const k of ['quantidade', 'quantidadeCautelada', 'item', 'observacao']) {
+                    if (JSON.stringify(atual[k]) !== JSON.stringify(original[k])) throw new Error('O material mudou em outro aparelho. Reabra a edição para conferir o saldo atual.');
+                }
+                if (JSON.stringify(atual.path || []) !== JSON.stringify(original.path || [])) throw new Error('Localização alterada por outro operador. Reabra a edição.');
+                const cautelada = inteiro(atual.quantidadeCautelada ?? 0, 'Cautelado');
+                // Alterar o nome não reconcilia silenciosamente um total legado divergente.
+                const total = quantidade !== Number(atual.quantidade) || atual.quantidadeTotal == null
+                    ? quantidade + cautelada : inteiro(atual.quantidadeTotal, 'Total');
+                tx.update(referencia, { ...obterCamposLegados(caminho), path: caminho, item: editMatNome.trim(),
+                    quantidade, quantidadeCautelada: cautelada, quantidadeTotal: total,
+                    observacao: editMatObs.trim(), updatedAt: serverTimestamp() });
+                tx.set(historicoRef, { tipo: 'editar_material', uid: auth.currentUser?.uid || '', em: serverTimestamp(),
+                    antes: { item: atual.item, quantidade: atual.quantidade, quantidadeCautelada: cautelada, quantidadeTotal: atual.quantidadeTotal ?? null, path: atual.path || [] },
+                    depois: { item: editMatNome.trim(), quantidade, quantidadeCautelada: cautelada, quantidadeTotal: total, path: caminho } });
             });
-
-            setModalEditarMaterialVisivel(false);
-            setIdMaterialEditando(null);
-            setCaminhoEdicaoOriginal([]);
-            Alert.alert('Sucesso', 'Material atualizado com sucesso!');
-        } catch (error) {
-            console.error(error);
-            Alert.alert('Erro', 'Não foi possível atualizar o material.');
-        }
+            setModalEditarMaterialVisivel(false); setIdMaterialEditando(null);
+            avisar('Material atualizado', 'Alterações salvas.');
+        } catch (error) { avisar('Erro ao editar material', error.message); }
+        finally { travaMaterial.current = false; setSalvandoMaterial(false); }
     }
 
     function abrirOpcoesPasta(pasta) {
@@ -451,7 +457,7 @@ export function useMateriais(listaCautelas = []) {
             const registros = await carregarRegistrosAtuais();
 
             if (pastaComMesmoNomeExiste(caminhoPai, novoNome, caminhoAntigo, registros)) {
-                Alert.alert('Atenção', 'Já existe uma prateleira com esse nome neste local.');
+                avisar('Atenção', 'Já existe uma prateleira com esse nome neste local.');
                 return;
             }
 
@@ -481,7 +487,7 @@ export function useMateriais(listaCautelas = []) {
             setCaminhoMateriais([]);
         } catch (error) {
             console.error(error);
-            Alert.alert('Erro', 'Não foi possível renomear a prateleira.');
+            avisar('Erro', 'Não foi possível renomear a prateleira.');
         }
     }
 
@@ -499,7 +505,7 @@ export function useMateriais(listaCautelas = []) {
                 );
 
                 if (materiaisCautelados.length > 0) {
-                    Alert.alert(
+                    avisar(
                         'Prateleira em uso',
                         `Não é possível excluir esta prateleira porque há material cautelado: ${materiaisCautelados
                             .slice(0, 3)
@@ -519,7 +525,7 @@ export function useMateriais(listaCautelas = []) {
                 });
             } else {
                 if (obterCautelasAtivasDoMaterial(item.dados.id).length > 0) {
-                    Alert.alert(
+                    avisar(
                         'Material cautelado',
                         'Dê baixa ou exclua a cautela ativa antes de remover este material do estoque.'
                     );
@@ -528,14 +534,14 @@ export function useMateriais(listaCautelas = []) {
 
                 setDadosConfirmacao({
                     titulo: 'Remover do Estoque',
-                    msg: `Deseja excluir permanentemente o item "${item.dados.item}"?`,
+                    msg: `Deseja remover da lista o item "${item.dados.item}"?`,
                     acao: async () => {
                         setConfirmacaoVisivel(false);
                         try {
-                            await executarOperacoesEmLotes([{ id: item.dados.id, excluir: true }]);
+                            await arquivarRegistros([item.dados.id]);
                         } catch (error) {
                             console.error(error);
-                            Alert.alert('Erro', 'Não foi possível excluir o material.');
+                            avisar('Erro', 'Não foi possível excluir o material.');
                         }
                     }
                 });
@@ -544,18 +550,34 @@ export function useMateriais(listaCautelas = []) {
         }, 250);
     }
 
+    async function arquivarRegistros(ids) {
+        if (ids.length > 200) throw new Error('Remova em grupos menores de até 200 registros.');
+        await runTransaction(db, async tx => {
+            const registros = [];
+            for (const id of ids) {
+                const referencia = doc(db, 'materiais', id);
+                const snap = await tx.get(referencia);
+                if (snap.exists()) registros.push([referencia, snap.data()]);
+            }
+            for (const [referencia, dados] of registros) {
+                if (Number(dados.quantidadeCautelada || 0) > 0) throw new Error('Há material cautelado. Conclua a devolução antes de remover.');
+                tx.update(referencia, { arquivado: true, archivedAt: serverTimestamp() });
+            }
+        });
+    }
+
     async function executarExclusaoPasta(pasta) {
         try {
             const registros = await carregarRegistrosAtuais();
             const operacoes = registros
-                .filter(registro => caminhoEhPrefixo(pasta.path, obterCaminhoRegistro(registro)))
+                .filter(registro => !registro.arquivado && caminhoEhPrefixo(pasta.path, obterCaminhoRegistro(registro)))
                 .map(registro => ({ id: registro.id, excluir: true }));
 
-            await executarOperacoesEmLotes(operacoes);
+            await arquivarRegistros(operacoes.map(o => o.id));
             setCaminhoMateriais([]);
         } catch (error) {
             console.error(error);
-            Alert.alert('Erro', 'Não foi possível excluir a prateleira.');
+            avisar('Erro', 'Não foi possível excluir a prateleira.');
         }
     }
 
@@ -652,7 +674,7 @@ export function useMateriais(listaCautelas = []) {
 
     function obterMateriaisSelecionadosParaCautela() {
         if (itensSelecionados.length === 0) {
-            Alert.alert('Atenção', 'Selecione pelo menos um material.');
+            avisar('Atenção', 'Selecione pelo menos um material.');
             return null;
         }
 
@@ -671,7 +693,7 @@ export function useMateriais(listaCautelas = []) {
             setItensSelecionados(idsAindaExistentes);
             if (idsAindaExistentes.length === 0) setModoSelecao(false);
 
-            Alert.alert(
+            avisar(
                 'Lista atualizada',
                 'Um dos materiais selecionados não existe mais. Confira a seleção e tente novamente.'
             );
@@ -683,7 +705,7 @@ export function useMateriais(listaCautelas = []) {
         );
 
         if (semSaldo.length > 0) {
-            Alert.alert(
+            avisar(
                 'Material sem saldo',
                 `Não há quantidade disponível para: ${semSaldo.map(registro => registro.item).join(', ')}.`
             );
@@ -706,7 +728,7 @@ export function useMateriais(listaCautelas = []) {
 
     function abrirMovimentacaoSelecionados() {
         if (itensSelecionados.length === 0) {
-            Alert.alert('Atenção', 'Selecione pelo menos um material.');
+            avisar('Atenção', 'Selecione pelo menos um material.');
             return;
         }
 
@@ -744,7 +766,7 @@ export function useMateriais(listaCautelas = []) {
 
     async function moverItensSelecionados() {
         if (itensSelecionados.length === 0) {
-            Alert.alert('Atenção', 'Selecione pelo menos um material.');
+            avisar('Atenção', 'Selecione pelo menos um material.');
             return;
         }
 
@@ -759,7 +781,7 @@ export function useMateriais(listaCautelas = []) {
         }));
 
         await executarOperacoesEmLotes(operacoes);
-        Alert.alert('Sucesso', `${itensSelecionados.length} material(is) movido(s) com sucesso!`);
+        avisar('Sucesso', `${itensSelecionados.length} material(is) movido(s) com sucesso!`);
     }
 
     async function moverPasta() {
@@ -770,12 +792,12 @@ export function useMateriais(listaCautelas = []) {
             caminhosIguais(caminhoDestinoMover, caminhoOrigem) ||
             caminhoEhPrefixo(caminhoOrigem, caminhoDestinoMover)
         ) {
-            Alert.alert('Atenção', 'Uma prateleira não pode ser movida para dentro dela mesma.');
+            avisar('Atenção', 'Uma prateleira não pode ser movida para dentro dela mesma.');
             return false;
         }
 
         if (caminhosIguais(caminhoDestinoMover, caminhoPaiAtual)) {
-            Alert.alert('Atenção', 'Esta prateleira já está nesse local.');
+            avisar('Atenção', 'Esta prateleira já está nesse local.');
             return false;
         }
 
@@ -783,7 +805,7 @@ export function useMateriais(listaCautelas = []) {
         const nomePasta = caminhoOrigem[caminhoOrigem.length - 1];
 
         if (pastaComMesmoNomeExiste(caminhoDestinoMover, nomePasta, caminhoOrigem, registros)) {
-            Alert.alert('Atenção', 'O destino já possui uma prateleira com esse nome.');
+            avisar('Atenção', 'O destino já possui uma prateleira com esse nome.');
             return false;
         }
 
@@ -807,7 +829,7 @@ export function useMateriais(listaCautelas = []) {
             });
 
         await executarOperacoesEmLotes(operacoes);
-        Alert.alert('Sucesso', 'Prateleira e todo o seu conteúdo foram movidos!');
+        avisar('Sucesso', 'Prateleira e todo o seu conteúdo foram movidos!');
         setCaminhoMateriais([]);
         return true;
     }
@@ -827,7 +849,7 @@ export function useMateriais(listaCautelas = []) {
             setPastaSendoMovida(null);
         } catch (error) {
             console.error(error);
-            Alert.alert('Erro', 'Não foi possível concluir a movimentação.');
+            avisar('Erro', 'Não foi possível concluir a movimentação.');
         }
     }
 
@@ -855,7 +877,7 @@ export function useMateriais(listaCautelas = []) {
     });
 
     return {
-        listaMateriais,
+        listaMateriais, salvandoMaterial,
         pesquisaMateriais, setPesquisaMateriais,
         caminhoMateriais, setCaminhoMateriais,
         modalMateriaisVisivel, setModalMateriaisVisivel,

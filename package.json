@@ -6,6 +6,7 @@
     "@react-native-community/datetimepicker": "8.4.4",
     "expo": "~54.0.35",
     "expo-file-system": "~19.0.23",
+    "expo-image-manipulator": "~14.0.8",
     "expo-navigation-bar": "~5.0.10",
     "expo-print": "~15.0.8",
     "expo-sharing": "~14.0.8",
@@ -23,7 +24,15 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build": "expo export --platform web",
+    "test": "node --test tests/estoque.test.mjs",
+    "test:integration": "firebase emulators:exec --config firebase.test.json --project demo-cautelas --only auth,firestore \"node --test tests/integracao.test.mjs\"",
+    "test:e2e": "node tests/build-test.mjs && firebase emulators:exec --config firebase.test.json --project demo-cautelas --only auth,firestore \"node tests/e2e.mjs\""
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "firebase-tools": "^15.32.0"
+  }
 }
