@@ -44,7 +44,6 @@ export default function LivroScreen({ abrirGerenciar, pesquisa, setPesquisa, cau
           {!!cautela.previsaoDevolucao && <Text style={styles.cartaoTexto}>Previsão de devolução: {formatarPrevisao(cautela.previsaoDevolucao)}</Text>}
           {!!cautela.totalAcrescimos && <Text style={[styles.cartaoTexto, { color: '#D4A25F' }]}>Acréscimos assinados: {cautela.totalAcrescimos}</Text>}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            <TouchableOpacity style={styles.btnAssinarDepois} onPress={() => abrirGerenciar(cautela, 'detalhes')}><Text style={styles.btnAssinarDepoisTexto}>Detalhes / PDF</Text></TouchableOpacity>
             <TouchableOpacity style={styles.btnAssinarDepois} onPress={() => abrirGerenciar(cautela, 'editar')}><Text style={styles.btnAssinarDepoisTexto}>Editar</Text></TouchableOpacity>
             {!cautela.dataEntrega && cautela.estoqueDevolvido !== true && !!cautela.assinaturaCautela && <TouchableOpacity style={styles.btnAssinarDepois} onPress={() => abrirGerenciar(cautela, 'adicionar')}><Text style={styles.btnAssinarDepoisTexto}>+ Material</Text></TouchableOpacity>}
           </View>

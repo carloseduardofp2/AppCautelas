@@ -80,6 +80,7 @@ export default function MainContent() {
         editMatSubLocal, setEditMatSubLocal,
         editMatNome, setEditMatNome,
         editMatQtd, setEditMatQtd,
+        editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatMotivo, setEditMatMotivo, editMatSaldoOriginal,
         editMatObs, setEditMatObs,
         salvarEdicaoMaterial,
         modalTipoAdicaoVisivel, setModalTipoAdicaoVisivel,
@@ -285,6 +286,9 @@ export default function MainContent() {
                 editMatSubLocal={editMatSubLocal} setEditMatSubLocal={setEditMatSubLocal}
                 editMatNome={editMatNome} setEditMatNome={setEditMatNome}
                 editMatQtd={editMatQtd} setEditMatQtd={setEditMatQtd}
+                editMatCautelada={editMatCautelada} setEditMatCautelada={setEditMatCautelada}
+                editMatResponsavel={editMatResponsavel} setEditMatResponsavel={setEditMatResponsavel}
+                editMatMotivo={editMatMotivo} setEditMatMotivo={setEditMatMotivo} editMatSaldoOriginal={editMatSaldoOriginal}
                 editMatObs={editMatObs} setEditMatObs={setEditMatObs}
                 salvarEdicaoMaterial={salvarEdicaoMaterial}
 

@@ -65,8 +65,6 @@ export default function ModalNovaCautela({
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>Nova Cautela</Text>
-              <CampoData value={previsaoDevolucao} onChange={setPrevisaoDevolucao} />
-              <SeletorEstoque materiais={estoque} onSelect={selecionarMaterial} />
 
               <TextInput
                 style={styles.input}
@@ -111,44 +109,8 @@ export default function ModalNovaCautela({
                 ))}
               </View>
 
-              {/* 🔥 Lista de materiais: agora é possível cautelar mais de um item de uma vez */}
-              {materiaisCautela.map((item, index) => (
-                <View key={`${item.materialId || 'manual'}-${index}`} style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TextInput
-                      style={[styles.input, { flex: 2, marginRight: 8, marginBottom: 0 }]}
-                      placeholder="Material"
-                      placeholderTextColor="#64748B"
-                      editable={!item.materialId}
-                      value={item.nome}
-                      onChangeText={(v) => atualizarLinhaMaterial(index, 'nome', v)}
-                    />
-                    <TextInput
-                      style={[styles.input, { flex: 1, marginRight: 8, marginBottom: 0 }]}
-                      placeholder="Qtd"
-                      placeholderTextColor="#64748B"
-                      keyboardType="numeric"
-                      value={item.quantidade}
-                      onChangeText={(v) => atualizarLinhaMaterial(index, 'quantidade', v)}
-                    />
-                    {materiaisCautela.length > 1 && (
-                      <TouchableOpacity onPress={() => removerLinhaMaterial(index)} style={{ padding: 6 }}>
-                        <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: '700' }}>✕</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {item.materialId && (
-                    <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 5, marginLeft: 3 }}>
-                      📍 {item.caminhoExibicao || 'Início'} • Disponível: {item.estoqueDisponivel}
-                    </Text>
-                  )}
-                </View>
-              ))}
-
-              <TouchableOpacity onPress={adicionarLinhaMaterial} style={{ marginBottom: 15 }}>
-                <Text style={{ color: '#38BDF8', fontWeight: '600' }}>+ Adicionar material avulso (sem estoque)</Text>
-              </TouchableOpacity>
+              <SeletorEstoque materiais={estoque} selecionados={materiaisCautela} onSelect={selecionarMaterial} onRemove={removerLinhaMaterial} />
+              <CampoData value={previsaoDevolucao} onChange={setPrevisaoDevolucao} />
 
               <CampoData value={`${dataSelecionada.getFullYear()}-${String(dataSelecionada.getMonth()+1).padStart(2,'0')}-${String(dataSelecionada.getDate()).padStart(2,'0')}`} onChange={v => { if (v) aoMudarData({ type: 'set' }, new Date(`${v}T12:00:00`)); }} limpavel={false} label="Data da retirada" />
 

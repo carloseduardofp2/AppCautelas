@@ -70,13 +70,7 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
         <CampoData value={previsao} onChange={setPrevisao} />{campo('Motivo da correção', motivo, setMotivo)}
       </>}
       {modo === 'adicionar' && <>
-        <SeletorEstoque materiais={estoque} onSelect={m => setNovos(v => [...v, m])} />
-        {novos.map((m, i) => <View key={i} style={{ marginBottom: 10 }}>
-          <TextInput accessibilityLabel="Material acrescentado" style={styles.input} editable={!m.materialId} placeholder="Nome do material avulso" placeholderTextColor="#94A3B8" value={m.nome} onChangeText={v => setNovos(a => a.map((x,j) => i === j ? { ...x, nome: v } : x))} />
-          <TextInput accessibilityLabel={`Quantidade de ${m.nome}`} style={styles.input} keyboardType="numeric" value={String(m.quantidade)} onChangeText={v => setNovos(a => a.map((x,j) => i === j ? { ...x, quantidade: v } : x))} />
-          <TouchableOpacity onPress={() => setNovos(a => a.filter((_,j) => j !== i))}><Text style={styles.btnCancelarTexto}>Remover linha</Text></TouchableOpacity>
-        </View>)}
-        <TouchableOpacity style={{ padding: 12 }} onPress={() => setNovos(a => [...a, { nome: '', quantidade: '1' }])}><Text style={styles.btnCancelarTexto}>+ Material avulso (sem estoque)</Text></TouchableOpacity>
+        <SeletorEstoque materiais={estoque} selecionados={novos} onSelect={m => setNovos(v => [...v, m])} onRemove={i => setNovos(v => v.filter((_,j) => i !== j))} />
       </>}
       {modo === 'devolver' && <>
         <TouchableOpacity style={styles.btnSalvar} onPress={() => setQuantidades(Object.fromEntries(itens.map(m => [m.linhaId, String(m.pendente)])))}><Text style={styles.btnSalvarTexto}>Selecionar toda a quantidade pendente</Text></TouchableOpacity>

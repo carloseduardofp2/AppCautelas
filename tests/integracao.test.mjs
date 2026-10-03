@@ -74,3 +74,20 @@ test('fixture recusa acesso sem sessão',async()=>{
 
 });
 after(async()=>{await Promise.all(apps.map(deleteApp));});
+
+test('ajuste manual auditado, saldo corrigido e proteção contra edição concorrente',async()=>{
+ const {editarMaterial}=await import('../src/services/materialService.js');
+ await material('ajuste',10);
+ const ref=doc(a.db,'materiais','ajuste');
+ const original=(await getDoc(ref)).data();
+ const dados={item:'ajuste',quantidade:7,quantidadeCautelada:3,path:[],observacao:''};
+ await assert.rejects(editarMaterial(a.db,{materialId:'ajuste',original,dados,uid:a.uid,operador:'',motivo:''}));
+ await saldos('ajuste',10,0);
+ await editarMaterial(a.db,{materialId:'ajuste',original,dados,uid:a.uid,operador:'Cb Conferente',motivo:'Conferência de cautelas antigas'});
+ await saldos('ajuste',7,3);
+ const h=(await getDocs(collection(a.db,'materiais','ajuste','historico'))).docs[0].data();
+ assert.equal(h.tipo,'ajustar_saldo');assert.equal(h.antes.quantidadeCautelada,0);assert.equal(h.depois.quantidadeCautelada,3);assert.equal(h.operador,'Cb Conferente');
+ await assert.rejects(editarMaterial(a.db,{materialId:'ajuste',original,dados:{...dados,quantidade:6},uid:a.uid,operador:'Cb Outro',motivo:'Conferência concorrente'}),/mudou/);
+ await assert.rejects(editarMaterial(a.db,{materialId:'ajuste',original,dados:{...dados,quantidadeCautelada:-1},uid:a.uid,operador:'Cb Outro',motivo:'Inválido'}));
+ await saldos('ajuste',7,3);
+});

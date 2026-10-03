@@ -1,3 +1,4 @@
+import { editarMaterial } from '../services/materialService';
 import { avisar } from '../utils/avisar';
 import { useEffect, useState, useRef } from 'react';
 import { Alert } from 'react-native';
@@ -11,7 +12,7 @@ import {
     updateDoc,
     writeBatch
 } from 'firebase/firestore';
-import { itensCautela, inteiro } from '../utils/estoque.mjs';
+import { itensCautela } from '../utils/estoque.mjs';
 import { compararNatural } from '../utils/ordenacao.mjs';
 import { removerAcentos } from '../utils/formatters';
 
@@ -76,6 +77,10 @@ export function useMateriais(listaCautelas = []) {
     const [editMatSubLocal, setEditMatSubLocal] = useState('');
     const [editMatNome, setEditMatNome] = useState('');
     const [editMatQtd, setEditMatQtd] = useState('');
+    const [editMatCautelada, setEditMatCautelada] = useState('0');
+    const [editMatResponsavel, setEditMatResponsavel] = useState('');
+    const [editMatMotivo, setEditMatMotivo] = useState('');
+    const [editMatSaldoOriginal, setEditMatSaldoOriginal] = useState({});
     const [editMatObs, setEditMatObs] = useState('');
     const [caminhoEdicaoOriginal, setCaminhoEdicaoOriginal] = useState([]);
 
@@ -353,6 +358,9 @@ export function useMateriais(listaCautelas = []) {
         setEditMatSubLocal(campos.subLocalizacao);
         setEditMatNome(material.item || '');
         setEditMatQtd(String(material.quantidade ?? 0));
+        setEditMatCautelada(String(material.quantidadeCautelada ?? 0));
+        setEditMatResponsavel(''); setEditMatMotivo('');
+        setEditMatSaldoOriginal({disponivel:material.quantidade ?? 0,cautelada:material.quantidadeCautelada ?? 0});
         setEditMatObs(material.observacao || '');
         setModalEditarMaterialVisivel(true);
     }
@@ -378,28 +386,10 @@ export function useMateriais(listaCautelas = []) {
         travaMaterial.current = true; setSalvandoMaterial(true);
         const original = materialEdicaoRef.current;
         try {
-            const historicoRef = doc(collection(db, 'materiais', idMaterialEditando, 'historico'));
-            await runTransaction(db, async tx => {
-                const referencia = doc(db, 'materiais', idMaterialEditando);
-                const snapshot = await tx.get(referencia);
-                if (!snapshot.exists()) throw new Error('O material não existe mais.');
-                const atual = snapshot.data();
-                if (atual.arquivado) throw new Error('O material foi removido.');
-                for (const k of ['quantidade', 'quantidadeCautelada', 'item', 'observacao']) {
-                    if (JSON.stringify(atual[k]) !== JSON.stringify(original[k])) throw new Error('O material mudou em outro aparelho. Reabra a edição para conferir o saldo atual.');
-                }
-                if (JSON.stringify(atual.path || []) !== JSON.stringify(original.path || [])) throw new Error('Localização alterada por outro operador. Reabra a edição.');
-                const cautelada = inteiro(atual.quantidadeCautelada ?? 0, 'Cautelado');
-                // Alterar o nome não reconcilia silenciosamente um total legado divergente.
-                const total = quantidade !== Number(atual.quantidade) || atual.quantidadeTotal == null
-                    ? quantidade + cautelada : inteiro(atual.quantidadeTotal, 'Total');
-                tx.update(referencia, { ...obterCamposLegados(caminho), path: caminho, item: editMatNome.trim(),
-                    quantidade, quantidadeCautelada: cautelada, quantidadeTotal: total,
-                    observacao: editMatObs.trim(), updatedAt: serverTimestamp() });
-                tx.set(historicoRef, { tipo: 'editar_material', uid: auth.currentUser?.uid || '', em: serverTimestamp(),
-                    antes: { item: atual.item, quantidade: atual.quantidade, quantidadeCautelada: cautelada, quantidadeTotal: atual.quantidadeTotal ?? null, path: atual.path || [] },
-                    depois: { item: editMatNome.trim(), quantidade, quantidadeCautelada: cautelada, quantidadeTotal: total, path: caminho } });
-            });
+            await editarMaterial(db, {materialId:idMaterialEditando, original, uid:auth.currentUser?.uid,
+                operador:editMatResponsavel, motivo:editMatMotivo,
+                dados:{...obterCamposLegados(caminho), path:caminho, item:editMatNome.trim(),
+                    quantidade, quantidadeCautelada:editMatCautelada, observacao:editMatObs.trim()}});
             setModalEditarMaterialVisivel(false); setIdMaterialEditando(null);
             avisar('Material atualizado', 'Alterações salvas.');
         } catch (error) { avisar('Erro ao editar material', error.message); }
@@ -893,6 +883,7 @@ export function useMateriais(listaCautelas = []) {
         editMatSubLocal, setEditMatSubLocal,
         editMatNome, setEditMatNome,
         editMatQtd, setEditMatQtd,
+        editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatMotivo, setEditMatMotivo, editMatSaldoOriginal,
         editMatObs, setEditMatObs,
         salvarEdicaoMaterial,
         modalTipoAdicaoVisivel, setModalTipoAdicaoVisivel,

@@ -100,7 +100,7 @@ export function useCautelas() {
         setMateriaisCautela(prev => [...prev, { nome: '', quantidade: '' }]);
     };
     const removerLinhaMaterial = (index) => {
-        setMateriaisCautela(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== index));
+        setMateriaisCautela(prev => prev.filter((_, i) => i !== index));
     };
     const atualizarLinhaMaterial = (index, campo, valor) => {
         setMateriaisCautela(prev => prev.map((item, i) => {

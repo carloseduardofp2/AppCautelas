@@ -30,6 +30,7 @@ export default function ModalMaterial({ salvandoMaterial,
   setEditMatNome,
   editMatQtd,
   setEditMatQtd,
+  editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatMotivo, setEditMatMotivo, editMatSaldoOriginal = {},
   editMatObs,
   setEditMatObs,
   salvarEdicaoMaterial,
@@ -140,7 +141,7 @@ export default function ModalMaterial({ salvandoMaterial,
             <View style={styles.modalContent}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={styles.modalTitle}>Editar Item / Localização</Text>
-                <Text style={styles.cartaoTexto}>A quantidade abaixo é a disponível. O saldo cautelado será preservado.</Text>
+
 
                 <TextInput
                   style={styles.input}
@@ -166,14 +167,22 @@ export default function ModalMaterial({ salvandoMaterial,
                   onChangeText={setEditMatNome}
                 />
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Quantidade em Estoque"
-                  placeholderTextColor="#64748B"
-                  keyboardType="numeric"
-                  value={editMatQtd}
-                  onChangeText={setEditMatQtd}
-                />
+                <View style={{backgroundColor:'#142133',padding:14,borderWidth:1,borderColor:'#334155',borderRadius:12,marginBottom:15}}>
+                  <Text style={[styles.label,{color:'#D4A25F',marginBottom:12}]}>Conferência do estoque</Text>
+                  <Text style={{color:'#94A3B8',fontSize:12,marginBottom:12}}>Atual: {editMatSaldoOriginal.disponivel} disponível(is) · {editMatSaldoOriginal.cautelada} cautelado(s)</Text>
+                  <Text style={styles.label}>Disponível</Text>
+                  <TextInput accessibilityLabel="Quantidade disponível" style={styles.input} keyboardType="numeric" value={editMatQtd} onChangeText={setEditMatQtd} />
+                  <Text style={styles.label}>Cautelado</Text>
+                  <TextInput accessibilityLabel="Quantidade cautelada" style={styles.input} keyboardType="numeric" value={editMatCautelada} onChangeText={setEditMatCautelada} />
+                  <Text style={{color:'#D4A25F',fontWeight:'700'}}>Total após salvar: {Number.isSafeInteger(Number(editMatQtd)) && Number.isSafeInteger(Number(editMatCautelada)) && editMatQtd !== '' && editMatCautelada !== '' ? Number(editMatQtd)+Number(editMatCautelada) : '—'}</Text>
+                  <Text style={{color:'#94A3B8',fontSize:12,lineHeight:18,marginTop:8}}>Confira os saldos físicos e as cautelas em aberto. O ajuste corrige o cadastro; os materiais e as assinaturas das cautelas continuam registrados.</Text>
+                  {(Number(editMatQtd)!==Number(editMatSaldoOriginal.disponivel) || Number(editMatCautelada)!==Number(editMatSaldoOriginal.cautelada)) && <View style={{marginTop:14}}>
+                    <Text style={styles.label}>Responsável pelo ajuste</Text>
+                    <TextInput accessibilityLabel="Responsável pelo ajuste" style={styles.input} placeholder="Ex: Cb Carlos" placeholderTextColor="#94A3B8" value={editMatResponsavel} onChangeText={setEditMatResponsavel} maxLength={200} />
+                    <Text style={styles.label}>Motivo do ajuste</Text>
+                    <TextInput accessibilityLabel="Motivo do ajuste" style={styles.input} placeholder="Descreva o que foi conferido e corrigido" placeholderTextColor="#94A3B8" value={editMatMotivo} onChangeText={setEditMatMotivo} maxLength={1000} multiline />
+                  </View>}
+                </View>
 
                 <TextInput
                   style={[styles.input, styles.inputArea]}
