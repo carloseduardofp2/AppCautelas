@@ -25,7 +25,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web",
+    "build": "expo export --platform web && node scripts/configurar-web.mjs",
     "test": "node --test tests/estoque.test.mjs",
     "test:integration": "firebase emulators:exec --config firebase.test.json --project demo-cautelas --only auth,firestore \"node --test tests/integracao.test.mjs\"",
     "test:e2e": "node tests/build-test.mjs && firebase emulators:exec --config firebase.test.json --project demo-cautelas --only auth,firestore \"node tests/e2e.mjs\""

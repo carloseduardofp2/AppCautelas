@@ -17,7 +17,7 @@ export function gerarHtmlLivro(lista) {
     let materiais = Array.isArray(itens) ? listaItens(itens) : `${escapar(c.material)} (${escapar(c.quantidade)})`;
     let assinaturaSaida = img(c.assinaturaCautela);
     acrescimos.forEach((h,i) => {
-      materiais += bloco(`<b>Acréscimo ${i+1} · ${escapar(hora(h))}</b>${listaItens(h.itens || [])}<div>Cautelado por: ${escapar(h.militar || original.militar || c.militar)}</div><div class="discreto">SecOp: ${escapar(h.operador || '-')}</div>`);
+      materiais += bloco(`<b>Acréscimo ${i+1} · ${escapar(hora(h))}</b>${listaItens(h.itens || [])}<div>Cautelado por: ${escapar(h.militar || original.militar || c.militar)}</div><div class="discreto">Militar da SecOp: ${escapar(h.operador || '-')}</div>`);
       assinaturaSaida += bloco(`<span class="discreto">Acréscimo ${i+1}</span><br>${img(h.assinatura)}`);
     });
     let observacao = escapar(original.observacao || '-');

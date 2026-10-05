@@ -46,7 +46,7 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
   const continuar = async () => {
     try {
       texto(operador, 'Militar da SecOp responsável');
-      if (modo === 'adicionar') normalizarItens(novos);
+      if (modo === 'adicionar') { texto(militar, 'Militar que está cautelando'); normalizarItens(novos); }
       if (modo === 'devolver') prepararDevolucao(cautela, quantidades);
       if (modo === 'editar' || modo === 'excluir') await salvar('');
       else setAssinando(true);
@@ -57,12 +57,13 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
   </View>;
   if (assinando) return <ModalAssinatura fechar={() => setAssinando(false)} handleAssinatura={salvar} refAssinatura={refAssinatura} tipoOperacao="acrescimo"
     titulo={['devolver','assinar_devolucao'].includes(modo) ? 'Assinatura da devolução' : 'Assinatura do acréscimo'}
-    descricao={`${cautela.militar} — ${modo === 'assinar_devolucao' ? `Devolução já registrada em ${cautela.dataEntrega}; somente coleta da assinatura, sem movimentação de estoque` : modo === 'adicionar' ? novos.map(m => `${m.nome}: ${m.quantidade}`).join('; ') : itens.filter(m => Number(quantidades[m.linhaId]) > 0).map(m => `${m.nome}: ${quantidades[m.linhaId]}`).join('; ')}. Confirme os materiais e quantidades antes de assinar.`} />;
+    descricao={`${modo === 'adicionar' ? `${militar} · Militar da SecOp: ${operador}` : cautela.militar} — ${modo === 'assinar_devolucao' ? `Devolução já registrada em ${cautela.dataEntrega}; somente coleta da assinatura, sem movimentação de estoque` : modo === 'adicionar' ? novos.map(m => `${m.nome}: ${m.quantidade}`).join('; ') : itens.filter(m => Number(quantidades[m.linhaId]) > 0).map(m => `${m.nome}: ${quantidades[m.linhaId]}`).join('; ')}. Confirme os materiais e quantidades antes de assinar.`} />;
   return <Modal visible transparent animationType="slide" onRequestClose={() => !salvando && fechar()}>
     <View style={styles.modalOverlay}><View style={styles.modalContent}><ScrollView keyboardShouldPersistTaps="handled">
       <Text style={styles.modalTitle}>{{ assinar_devolucao: 'Assinar devolução já registrada', adicionar: 'Adicionar materiais', editar: 'Corrigir informações', devolver: 'Devolução parcial ou total', detalhes: 'Detalhes e histórico', excluir: 'Excluir cautela' }[modo]}</Text>
       <Text style={[styles.cartaoTexto, { marginBottom: 12 }]}>{cautela.militar} — retirada: {cautela.dataCautela}</Text>
       {!!erroLegado && <Text style={{ color: '#FCA5A5' }}>Registro antigo requer conferência: {erroLegado}. Nenhum saldo será alterado por suposição.</Text>}
+      {modo === 'adicionar' && campo('Militar que está cautelando', militar, setMilitar)}
       {modo !== 'detalhes' && campo('Militar da SecOp responsável pelo lançamento', operador, setOperador)}
       {modo === 'editar' && <>
         <Text style={styles.cartaoTexto}>A correção terá histórico. Os dados vinculados à assinatura original serão preservados.</Text>

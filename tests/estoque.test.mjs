@@ -44,5 +44,5 @@ test('PDF mantém mais de seis materiais e acréscimos na mesma linha sem duplic
  assert.ok(!h.includes('ORIGINAIS'));assert.ok(!h.includes('Qtd original'));
  for(const m of itens) assert.ok(h.includes(`${m.nome} (1)`));
  assert.equal((h.match(/Extra \(2\)/g)||[]).length,1);
- assert.ok(h.includes('Cautelado por: Sd Exemplo'));assert.ok(h.includes('SecOp: Cb SecOp'));
+ assert.ok(h.includes('Cautelado por: Sd Exemplo'));assert.ok(h.includes('Militar da SecOp: Cb SecOp'));
 });

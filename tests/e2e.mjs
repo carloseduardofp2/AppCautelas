@@ -15,7 +15,10 @@ try{
  for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:8765')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox']});
  page=await browser.newPage({viewport:{width:1280,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{console.log('DIALOG',d.message());return d.accept();});
- await page.goto('http://127.0.0.1:8765');await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();
+ await page.goto('http://127.0.0.1:8765');assert.equal(await page.locator('link[rel=manifest]').getAttribute('href'),'/manifest.webmanifest?v=2');
+ const manifest=await (await page.request.get('http://127.0.0.1:8765/manifest.webmanifest?v=2')).json();
+ for(const icon of manifest.icons){const dimensions=await page.evaluate(src=>new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(`${i.naturalWidth}x${i.naturalHeight}`);i.onerror=reject;i.src=src;}),icon.src);assert.equal(dimensions,icon.sizes);}
+await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();
  await page.getByLabel('Abrir ações do Livro').click();await page.getByLabel('Nova cautela',{exact:true}).click();
  await page.getByPlaceholder('Mil Sec Op (Quem está entregando o material)').fill('Cb Operador');
  await page.getByPlaceholder('Militar que está pegando (ex: Cb Fulano)').fill('Sd Teste E2E');
@@ -28,7 +31,7 @@ try{
  await assinar();await page.getByText('Sd Teste E2E',{exact:true}).waitFor();
  let c=(await getDocs(collection(db,'cautelas'))).docs.find(d=>d.data().militar==='Sd Teste E2E');assert.ok(c);const id=c.id;
  let stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,7);assert.equal(stock.quantidadeCautelada,3);
- await page.getByText('+ Material',{exact:true}).click();await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Segundo');
+ await page.getByText('+ Material',{exact:true}).click();await page.getByLabel('Militar que está cautelando').fill('Sd Outro Militar');await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Segundo');await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${out}/acrescimo-dois-militares.png`});await page.setViewportSize({width:1280,height:900});
  await page.getByLabel('Selecionar material do estoque').click();await page.getByRole('button',{name:'Rádio de teste, disponível: 7, Início',exact:true}).click();await page.getByLabel('Quantidade a adicionar').fill('2');await page.getByText('+ Adicionar',{exact:true}).click();await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();
  await page.getByText('Acréscimos assinados: 1',{exact:true}).waitFor();stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,5);
  await page.getByText('Editar',{exact:true}).click();await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Corretor');await page.getByLabel('Motivo da correção').fill('Complementar observações');await page.getByLabel('Observação',{exact:true}).fill('Material conferido');await page.getByText('Salvar com histórico',{exact:true}).click();await page.getByText('Material conferido',{exact:true}).waitFor();
@@ -39,7 +42,7 @@ try{
  await page.getByLabel('Abrir ações do Livro').click();await page.getByText('📄',{exact:true}).click();
  const popupPromise=page.waitForEvent('popup');await page.getByText('Todas as Cautelas',{exact:true}).click();
  const popup=await popupPromise;await popup.getByText(/Acréscimo 1 ·/).waitFor();
- await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
+ await popup.getByText('Cautelado por: Sd Outro Militar',{exact:true}).waitFor();await popup.getByText('Militar da SecOp: Cb Segundo',{exact:true}).waitFor();await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
 
  for(const [w,h] of [[360,800],[768,1024],[1280,900]]){await page.setViewportSize({width:w,height:h});await page.reload();await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();await page.screenshot({path:`${out}/livro-${w}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
  await page.getByText('Materiais',{exact:true}).click();await page.getByText('Rádio de teste',{exact:true}).waitFor();

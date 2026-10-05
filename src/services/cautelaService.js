@@ -51,7 +51,7 @@ export async function salvarMovimentacao(db, p) {
       };
       movimentos = agruparMovimentos(novos); itensEvento = novos;
       registro.assinatura = assinatura;
-      registro.militar = c.militar;
+      registro.militar = texto(p.militar, 'Militar que está cautelando');
     } else if (p.tipo === 'devolver' || p.tipo === 'excluir') {
       if (c.excluida) throw new Error('Cautela já excluída.');
       if (p.tipo === 'devolver') exigirAberta(c);

@@ -91,3 +91,18 @@ test('ajuste manual auditado, saldo corrigido e proteção contra edição conco
  await assert.rejects(editarMaterial(a.db,{materialId:'ajuste',original,dados:{...dados,quantidadeCautelada:-1},uid:a.uid,operador:'Cb Outro',motivo:'Inválido'}));
  await saldos('ajuste',7,3);
 });
+
+test('acréscimo identifica quem cautela e a SecOp sem mudar o militar original',async()=>{
+ await material('duas-identidades',4);
+ await salvar({tipo:'criar',operacaoId:'nomes-cautela',itens:[item('duas-identidades',1)]});
+ await assert.rejects(salvar({tipo:'adicionar',cautelaId:'nomes-cautela',operacaoId:'nome-vazio',militar:' ',itens:[item('duas-identidades',1)]}),/Militar que está cautelando/);
+ await saldos('duas-identidades',3,1);
+ await salvar({tipo:'adicionar',cautelaId:'nomes-cautela',operacaoId:'nomes-acrescimo',militar:'Sd Outro Militar',operador:'Cb Responsável SecOp',itens:[item('duas-identidades',1)]});
+ const cautela=(await getDoc(doc(a.db,'cautelas','nomes-cautela'))).data();
+ const evento=(await getDoc(doc(a.db,'cautelas','nomes-cautela','historico','nomes-acrescimo'))).data();
+ assert.equal(cautela.militar,'Sd Torcato');assert.equal(evento.militar,'Sd Outro Militar');assert.equal(evento.operador,'Cb Responsável SecOp');
+ const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');
+ const html=gerarHtmlLivro([{...cautela,historico:[evento]}]);
+ assert.ok(html.includes('Cautelado por: Sd Outro Militar'));assert.ok(html.includes('Militar da SecOp: Cb Responsável SecOp'));
+ await saldos('duas-identidades',2,2);
+});
