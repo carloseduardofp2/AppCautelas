@@ -28,11 +28,21 @@ test('PDF escapa conteúdo e não exibe seção de acréscimos vazia',()=>{
 });
 test('PDF preserva originais, previsão, acréscimos e histórico de correção',()=>{
  const h=gerarHtmlLivro([{militar:'Torcato',materiaisOriginais:[{nome:'Púlpito',quantidade:1}],materiais:[{nome:'Púlpito',quantidade:5}],previsaoDevolucao:'2026-10-05',historico:[{tipo:'adicionar',operador:'Operador',itens:[{nome:'Banner',quantidade:2}],em:{seconds:1790798400}},{tipo:'editar',antes:{militar:'Torcato'},depois:{militar:'Sd Torcato'},motivo:'Correção'}]}]);
- for(const t of ['Púlpito (1)','05/10/2026','MATERIAIS ADICIONADOS POSTERIORMENTE','Banner','Operador','CORREÇÃO REGISTRADA']) assert.ok(h.includes(t),t);
+ for(const t of ['Púlpito (1)','05/10/2026','Acréscimo 1','Banner','Operador','Correção ·']) assert.ok(h.includes(t),t);
 });
 
 test('ordenação natural de prateleiras e caminhos com números',async()=>{
  const {compararNatural}=await import('../src/utils/ordenacao.mjs');
  assert.deepEqual(['Prateleira 10','Prateleira 3','Prateleira 1','Prateleira 2'].sort(compararNatural),['Prateleira 1','Prateleira 2','Prateleira 3','Prateleira 10']);
  assert.deepEqual(['Armário 2 › Gaveta 11','Armário 2 › Gaveta 3','Armário 1'].sort(compararNatural),['Armário 1','Armário 2 › Gaveta 3','Armário 2 › Gaveta 11']);
+});
+
+test('PDF mantém mais de seis materiais e acréscimos na mesma linha sem duplicar',()=>{
+ const itens=Array.from({length:11},(_,i)=>({nome:`Material-${i}`,quantidade:1}));
+ const h=gerarHtmlLivro([{militar:'Sd Exemplo',materiaisOriginais:itens,materiais:[...itens,{nome:'Extra',quantidade:2}],historico:[{tipo:'adicionar',militar:'Sd Exemplo',operador:'Cb SecOp',itens:[{nome:'Extra',quantidade:2}]}]}]);
+ assert.equal((h.match(/<tr/g)||[]).length,2); // Cabeçalho + uma cautela.
+ assert.ok(!h.includes('ORIGINAIS'));assert.ok(!h.includes('Qtd original'));
+ for(const m of itens) assert.ok(h.includes(`${m.nome} (1)`));
+ assert.equal((h.match(/Extra \(2\)/g)||[]).length,1);
+ assert.ok(h.includes('Cautelado por: Sd Exemplo'));assert.ok(h.includes('SecOp: Cb SecOp'));
 });

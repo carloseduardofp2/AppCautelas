@@ -30,7 +30,7 @@ export default function ModalMaterial({ salvandoMaterial,
   setEditMatNome,
   editMatQtd,
   setEditMatQtd,
-  editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatMotivo, setEditMatMotivo, editMatSaldoOriginal = {},
+  editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatSaldoOriginal = {},
   editMatObs,
   setEditMatObs,
   salvarEdicaoMaterial,
@@ -179,8 +179,6 @@ export default function ModalMaterial({ salvandoMaterial,
                   {(Number(editMatQtd)!==Number(editMatSaldoOriginal.disponivel) || Number(editMatCautelada)!==Number(editMatSaldoOriginal.cautelada)) && <View style={{marginTop:14}}>
                     <Text style={styles.label}>Responsável pelo ajuste</Text>
                     <TextInput accessibilityLabel="Responsável pelo ajuste" style={styles.input} placeholder="Ex: Cb Carlos" placeholderTextColor="#94A3B8" value={editMatResponsavel} onChangeText={setEditMatResponsavel} maxLength={200} />
-                    <Text style={styles.label}>Motivo do ajuste</Text>
-                    <TextInput accessibilityLabel="Motivo do ajuste" style={styles.input} placeholder="Descreva o que foi conferido e corrigido" placeholderTextColor="#94A3B8" value={editMatMotivo} onChangeText={setEditMatMotivo} maxLength={1000} multiline />
                   </View>}
                 </View>
 

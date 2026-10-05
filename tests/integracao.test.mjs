@@ -83,7 +83,7 @@ test('ajuste manual auditado, saldo corrigido e proteção contra edição conco
  const dados={item:'ajuste',quantidade:7,quantidadeCautelada:3,path:[],observacao:''};
  await assert.rejects(editarMaterial(a.db,{materialId:'ajuste',original,dados,uid:a.uid,operador:'',motivo:''}));
  await saldos('ajuste',10,0);
- await editarMaterial(a.db,{materialId:'ajuste',original,dados,uid:a.uid,operador:'Cb Conferente',motivo:'Conferência de cautelas antigas'});
+ await editarMaterial(a.db,{materialId:'ajuste',original,dados,uid:a.uid,operador:'Cb Conferente'});
  await saldos('ajuste',7,3);
  const h=(await getDocs(collection(a.db,'materiais','ajuste','historico'))).docs[0].data();
  assert.equal(h.tipo,'ajustar_saldo');assert.equal(h.antes.quantidadeCautelada,0);assert.equal(h.depois.quantidadeCautelada,3);assert.equal(h.operador,'Cb Conferente');

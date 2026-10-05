@@ -38,7 +38,7 @@ try{
  assert.equal(await page.getByText('Detalhes / PDF',{exact:true}).count(),0);
  await page.getByLabel('Abrir ações do Livro').click();await page.getByText('📄',{exact:true}).click();
  const popupPromise=page.waitForEvent('popup');await page.getByText('Todas as Cautelas',{exact:true}).click();
- const popup=await popupPromise;await popup.getByText('MATERIAIS ADICIONADOS POSTERIORMENTE',{exact:true}).waitFor();
+ const popup=await popupPromise;await popup.getByText(/Acréscimo 1 ·/).waitFor();
  await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
 
  for(const [w,h] of [[360,800],[768,1024],[1280,900]]){await page.setViewportSize({width:w,height:h});await page.reload();await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();await page.screenshot({path:`${out}/livro-${w}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
@@ -48,13 +48,13 @@ try{
  await page.getByText('Salvar Alterações',{exact:true}).click();await page.getByText('Editar Item / Localização',{exact:true}).waitFor({state:'hidden'});
  stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,10);assert.equal(stock.quantidadeCautelada,0);assert.equal(stock.quantidadeTotal,10);
 
- // Correção explícita de cautelados: responsável/motivo obrigatórios e histórico persistido.
+ // Correção explícita de cautelados: responsável obrigatório, sem motivo e histórico persistido.
  await page.getByText('⋮',{exact:true}).click();await page.getByText('Editar',{exact:true}).click();
  await page.getByLabel('Quantidade cautelada').fill('2');
  await page.getByText('Salvar Alterações',{exact:true}).click();
  assert.equal((await getDoc(doc(db,'materiais','e2e-radio'))).data().quantidadeCautelada,0);
  await page.getByLabel('Responsável pelo ajuste').fill('Cb Conferente');
- await page.getByLabel('Motivo do ajuste').fill('Conferência de registros anteriores');
+ assert.equal(await page.getByLabel('Motivo do ajuste').count(),0);
  await page.getByText('Conferência do estoque',{exact:true}).scrollIntoViewIfNeeded();
  await page.screenshot({path:`${out}/ajuste-estoque.png`});
  await page.getByText('Salvar Alterações',{exact:true}).click();

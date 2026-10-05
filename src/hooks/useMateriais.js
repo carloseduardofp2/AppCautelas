@@ -79,7 +79,6 @@ export function useMateriais(listaCautelas = []) {
     const [editMatQtd, setEditMatQtd] = useState('');
     const [editMatCautelada, setEditMatCautelada] = useState('0');
     const [editMatResponsavel, setEditMatResponsavel] = useState('');
-    const [editMatMotivo, setEditMatMotivo] = useState('');
     const [editMatSaldoOriginal, setEditMatSaldoOriginal] = useState({});
     const [editMatObs, setEditMatObs] = useState('');
     const [caminhoEdicaoOriginal, setCaminhoEdicaoOriginal] = useState([]);
@@ -359,7 +358,7 @@ export function useMateriais(listaCautelas = []) {
         setEditMatNome(material.item || '');
         setEditMatQtd(String(material.quantidade ?? 0));
         setEditMatCautelada(String(material.quantidadeCautelada ?? 0));
-        setEditMatResponsavel(''); setEditMatMotivo('');
+        setEditMatResponsavel('');
         setEditMatSaldoOriginal({disponivel:material.quantidade ?? 0,cautelada:material.quantidadeCautelada ?? 0});
         setEditMatObs(material.observacao || '');
         setModalEditarMaterialVisivel(true);
@@ -387,7 +386,7 @@ export function useMateriais(listaCautelas = []) {
         const original = materialEdicaoRef.current;
         try {
             await editarMaterial(db, {materialId:idMaterialEditando, original, uid:auth.currentUser?.uid,
-                operador:editMatResponsavel, motivo:editMatMotivo,
+                operador:editMatResponsavel,
                 dados:{...obterCamposLegados(caminho), path:caminho, item:editMatNome.trim(),
                     quantidade, quantidadeCautelada:editMatCautelada, observacao:editMatObs.trim()}});
             setModalEditarMaterialVisivel(false); setIdMaterialEditando(null);
@@ -883,7 +882,7 @@ export function useMateriais(listaCautelas = []) {
         editMatSubLocal, setEditMatSubLocal,
         editMatNome, setEditMatNome,
         editMatQtd, setEditMatQtd,
-        editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatMotivo, setEditMatMotivo, editMatSaldoOriginal,
+        editMatCautelada, setEditMatCautelada, editMatResponsavel, setEditMatResponsavel, editMatSaldoOriginal,
         editMatObs, setEditMatObs,
         salvarEdicaoMaterial,
         modalTipoAdicaoVisivel, setModalTipoAdicaoVisivel,
