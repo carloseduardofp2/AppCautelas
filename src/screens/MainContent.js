@@ -88,7 +88,7 @@ export default function MainContent() {
         modalNovaPrateleiraVisivel, setModalNovaPrateleiraVisivel,
         nomeNovaPrateleira, setNomeNovaPrateleira,
         salvarNovaPrateleira,
-        pastasExibicao, itensExibicao,
+        pastasExibicao, itensExibicao, filtroCautelados, setFiltroCautelados, totalMateriaisCautelados,
         abrirOpcoesPasta, abrirOpcoesItem,
         menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
         confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao,
@@ -156,6 +156,7 @@ export default function MainContent() {
 
                 {abaAtiva === 'Materiais' && (
                     <MateriaisScreen
+                        filtroCautelados={filtroCautelados} setFiltroCautelados={setFiltroCautelados} totalMateriaisCautelados={totalMateriaisCautelados}
                         pesquisaMateriais={pesquisaMateriais}
                         setPesquisaMateriais={setPesquisaMateriais}
                         caminhoMateriais={caminhoMateriais}

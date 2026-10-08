@@ -68,7 +68,7 @@ export default function ModalNovaCautela({
 
               <TextInput
                 style={styles.input}
-                placeholder="Mil Sec Op (Quem está entregando o material)"
+                placeholder="Militar SecOp"
                 placeholderTextColor="#64748B"
                 value={novoMilSecOpCautela}
                 onChangeText={setNovoMilSecOpCautela}
@@ -76,7 +76,7 @@ export default function ModalNovaCautela({
 
               <TextInput
                 style={styles.input}
-                placeholder="Militar que está pegando (ex: Cb Fulano)"
+                placeholder="Militar"
                 placeholderTextColor="#64748B"
                 value={novoMilitar}
                 onChangeText={setNovoMilitar}

@@ -28,7 +28,7 @@ test('PDF escapa conteúdo e não exibe seção de acréscimos vazia',()=>{
 });
 test('PDF preserva originais, previsão, acréscimos e histórico de correção',()=>{
  const h=gerarHtmlLivro([{militar:'Torcato',materiaisOriginais:[{nome:'Púlpito',quantidade:1}],materiais:[{nome:'Púlpito',quantidade:5}],previsaoDevolucao:'2026-10-05',historico:[{tipo:'adicionar',operador:'Operador',itens:[{nome:'Banner',quantidade:2}],em:{seconds:1790798400}},{tipo:'editar',antes:{militar:'Torcato'},depois:{militar:'Sd Torcato'},motivo:'Correção'}]}]);
- for(const t of ['Púlpito (1)','05/10/2026','Acréscimo 1','Banner','Operador','Correção ·']) assert.ok(h.includes(t),t);
+ for(const t of ['Púlpito (1)','05/10/2026','Acréscimo 1','Banner','Operador','Edição 2']) assert.ok(h.includes(t),t);
 });
 
 test('ordenação natural de prateleiras e caminhos com números',async()=>{
@@ -44,5 +44,5 @@ test('PDF mantém mais de seis materiais e acréscimos na mesma linha sem duplic
  assert.ok(!h.includes('ORIGINAIS'));assert.ok(!h.includes('Qtd original'));
  for(const m of itens) assert.ok(h.includes(`${m.nome} (1)`));
  assert.equal((h.match(/Extra \(2\)/g)||[]).length,1);
- assert.ok(h.includes('Cautelado por: Sd Exemplo'));assert.ok(h.includes('Militar da SecOp: Cb SecOp'));
+ assert.ok(h.includes('Cautelado por: Sd Exemplo'));assert.ok(h.includes('Militar SecOp: Cb SecOp'));
 });

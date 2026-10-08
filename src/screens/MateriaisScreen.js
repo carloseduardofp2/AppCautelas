@@ -2,11 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, StyleSheet } from 'react-native';
 import { styles } from '../styles/MainStyles';
 
-export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem, menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
+export default function MateriaisScreen({ filtroCautelados, setFiltroCautelados, totalMateriaisCautelados, pesquisaMateriais, setPesquisaMateriais, caminhoMateriais, setCaminhoMateriais, pastasExibicao, itensExibicao, abrirOpcoesPasta, abrirOpcoesItem, menuVisivel, itemMenu, fecharMenu, acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,
   confirmacaoVisivel, setConfirmacaoVisivel, dadosConfirmacao, modalEditarPastaVisivel, setModalEditarPastaVisivel, nomeEdicaoPasta, setNomeEdicaoPasta, salvarEdicaoPasta, modoSelecao, itensSelecionados,
   modalMoverVisivel, caminhoDestinoMover, setCaminhoDestinoMover,
   pastaSendoMovida, ativarModoSelecao, toggleSelecao, confirmarMovimentacao, cancelarMovimentacao, todasAsPastas }) {
   const [materialExpandidoId, setMaterialExpandidoId] = useState(null);
+
+  const pastasVisiveis = [...pastasExibicao];
+  if (!filtroCautelados && caminhoMateriais.length === 0 && !pesquisaMateriais.trim()) {
+    const sala = pastasVisiveis.findIndex(p => p.nome.trim().toLocaleLowerCase('pt-BR') === 'sala');
+    if (sala >= 0) pastasVisiveis.unshift(pastasVisiveis.splice(sala, 1)[0]);
+    pastasVisiveis.splice(sala >= 0 ? 1 : 0, 0, {id:'filtro-cautelados', nome:'Materiais Cautelados', filtro:true, count:totalMateriaisCautelados});
+  }
+  const inicio = () => { setFiltroCautelados(false); setPesquisaMateriais(''); setCaminhoMateriais([]); };
 
   return (
     <View style={styles.secaoContainer}>
@@ -14,18 +22,19 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
 
       <TextInput
         style={[styles.inputPesquisa, { borderRadius: 25, paddingHorizontal: 20 }]}
-        placeholder="🔍 Encontre as minhas coisas!"
+        placeholder="Pesquisar materiais"
         placeholderTextColor="#64748B"
         value={pesquisaMateriais}
         onChangeText={setPesquisaMateriais}
       />
 
-      {pesquisaMateriais.trim() === '' && (
+      {(filtroCautelados || pesquisaMateriais.trim() === '') && (
         <View style={styles.nestBreadcrumbBar}>
-          <TouchableOpacity onPress={() => setCaminhoMateriais([])} style={{ padding: 5 }}>
+          <TouchableOpacity onPress={inicio} accessibilityLabel="Início dos materiais" style={{ padding: 5 }}>
             <Text style={styles.nestBreadcrumbHome}>🏠</Text>
           </TouchableOpacity>
-          {caminhoMateriais.map((step, idx) => (
+          {filtroCautelados && <Text style={styles.nestBreadcrumbText}>› Materiais Cautelados</Text>}
+          {!filtroCautelados && caminhoMateriais.map((step, idx) => (
             <View key={idx} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.nestBreadcrumbSeparator}>›</Text>
               <TouchableOpacity onPress={() => setCaminhoMateriais(caminhoMateriais.slice(0, idx + 1))} style={{ padding: 5 }}>
@@ -36,14 +45,15 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
         </View>
       )}
 
-      {pastasExibicao.map((pasta) => (
+      {pastasVisiveis.map((pasta) => (
         <TouchableOpacity
           key={pasta.id}
           style={styles.nestItem}
-          onPress={() => { setPesquisaMateriais(''); setCaminhoMateriais(pasta.path) }}
+          accessibilityLabel={pasta.nome}
+          onPress={() => { setPesquisaMateriais(''); setFiltroCautelados(!!pasta.filtro); setCaminhoMateriais(pasta.filtro ? [] : pasta.path); setMaterialExpandidoId(null); }}
         >
           <View style={styles.nestIconContainer}>
-            <Text style={styles.nestIcon}>📦</Text>
+            <Text style={styles.nestIcon}>{pasta.filtro ? '📋' : '📦'}</Text>
             {pasta.count > 0 && (
               <View style={styles.nestBadge}>
                 <Text style={styles.nestBadgeText}>{pasta.count}</Text>
@@ -57,7 +67,7 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
             )}
           </View>
 
-          <TouchableOpacity
+          {!pasta.filtro && <TouchableOpacity
             style={styles.nestMenuBtn}
             onPress={(event) => {
               event.stopPropagation?.();
@@ -66,7 +76,7 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
             <Text style={styles.nestMenuText}>⋮</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
         </TouchableOpacity>
       ))}
 
@@ -117,9 +127,10 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
                 <View style={styles.nestItemBody}>
                   <Text style={styles.nestTitle}>{item.item}</Text>
                   <Text style={styles.nestSubtitle}>
-                    Disponível: {item.quantidade} | {item.observacao || 'Sem obs'}
+                    Disponível: {item.quantidade} | Cautelados: {quantidadeCautelada}
                   </Text>
-                  {pesquisaMateriais.trim() !== '' && item.caminhoExibicao && (
+                  {!!item.observacao && <Text style={styles.nestSubtitle}>{item.observacao}</Text>}
+                  {(filtroCautelados || pesquisaMateriais.trim() !== '') && item.caminhoExibicao && (
                     <Text style={styles.nestSubtitle}>📍 {item.caminhoExibicao}</Text>
                   )}
                 </View>
@@ -189,7 +200,7 @@ export default function MateriaisScreen({ pesquisaMateriais, setPesquisaMateriai
       {pastasExibicao.length === 0 && itensExibicao.length === 0 && (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
           <Text style={{ fontSize: 40, marginBottom: 10 }}>📦</Text>
-          <Text style={styles.noResultsText}>Adicione objetos ou contentores aqui!</Text>
+          <Text style={styles.noResultsText}>{filtroCautelados ? (pesquisaMateriais.trim() ? 'Nenhum resultado.' : 'Nenhum material cautelado.') : 'Nenhum material aqui.'}</Text>
         </View>
       )}
 

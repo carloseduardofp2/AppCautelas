@@ -56,6 +56,7 @@ export function useMateriais(listaCautelas = []) {
     const [listaMateriais, setListaMateriais] = useState([]);
     const [pesquisaMateriais, setPesquisaMateriais] = useState('');
     const [caminhoMateriais, setCaminhoMateriais] = useState([]);
+    const [filtroCautelados, setFiltroCautelados] = useState(false);
 
     // --- FORMULÁRIO DE MATERIAIS (CADASTRO) ---
     const [modalMateriaisVisivel, setModalMateriaisVisivel] = useState(false);
@@ -591,10 +592,10 @@ export function useMateriais(listaCautelas = []) {
     function obterItensExibicao() {
         const termo = removerAcentos(pesquisaMateriais).trim();
 
-        if (termo) {
+        if (termo || filtroCautelados) {
             const itens = listaMateriais
                 .filter(registro => {
-                    if (registro.isFolder) return false;
+                    if (registro.isFolder || registro.arquivado || (filtroCautelados && !(Number(registro.quantidadeCautelada || 0) > 0))) return false;
                     const caminhoTexto = obterCaminhoRegistro(registro).join(' ');
                     return [
                         registro.item,
@@ -617,7 +618,7 @@ export function useMateriais(listaCautelas = []) {
                 )
                 .map(montarPasta);
 
-            return { pastas, itens };
+            return { pastas: filtroCautelados ? [] : pastas, itens };
         }
 
         const pastas = caminhosPastas
@@ -890,7 +891,8 @@ export function useMateriais(listaCautelas = []) {
         modalNovaPrateleiraVisivel, setModalNovaPrateleiraVisivel,
         nomeNovaPrateleira, setNomeNovaPrateleira,
         salvarNovaPrateleira,
-        pastasExibicao, itensExibicao,
+        pastasExibicao, itensExibicao, filtroCautelados, setFiltroCautelados,
+        totalMateriaisCautelados: listaMateriais.filter(m => !m.isFolder && !m.arquivado && Number(m.quantidadeCautelada || 0) > 0).length,
         abrirOpcoesPasta, abrirOpcoesItem,
         menuVisivel, itemMenu, fecharMenu,
         acaoEditarMenu, acaoMoverMenu, acaoExcluirMenu,

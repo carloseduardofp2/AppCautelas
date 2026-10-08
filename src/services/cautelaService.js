@@ -9,9 +9,9 @@ const exigirAberta = c => { if (c.dataEntrega || c.estoqueDevolvido === true || 
 export async function salvarMovimentacao(db, p) {
   const ref = doc(db, 'cautelas', p.cautelaId || p.operacaoId);
   const eventoRef = doc(collection(ref, 'historico'), p.operacaoId);
-  const operador = texto(p.operador, 'Militar da SecOp responsável');
+  const operador = texto(p.operador, 'Militar SecOp');
   const uid = texto(p.uid, 'Sessão');
-  const assinatura = ['criar', 'adicionar', 'devolver', 'assinar', 'assinar_devolucao'].includes(p.tipo)
+  const assinatura = ['criar', 'adicionar', 'devolver', 'assinar', 'assinar_devolucao', 'editar'].includes(p.tipo)
     ? validarAssinatura(p.assinatura, p.tipo !== 'criar') : '';
   return runTransaction(db, async tx => {
     const [snap, evento] = await Promise.all([tx.get(ref), tx.get(eventoRef)]);
@@ -34,24 +34,6 @@ export async function salvarMovimentacao(db, p) {
         schemaVersion: 2, revisao: 1, totalAcrescimos: 0, createdAt: serverTimestamp(), createdBy: uid
       };
       movimentos = agruparMovimentos(itens); itensEvento = itens;
-    } else if (p.tipo === 'adicionar') {
-      exigirAberta(c);
-      if (!c.assinaturaCautela) throw new Error('Colha primeiro a assinatura da retirada original.');
-      const novos = normalizarItens(p.itens);
-      const itens = itensCautela(c);
-      for (const m of novos) {
-        const atual = itens.find(i => i.materialId === m.materialId && i.nome === m.nome && i.estoqueControlado === m.estoqueControlado);
-        if (atual) { atual.quantidade += m.quantidade; atual.pendente += m.quantidade; }
-        else itens.push({ ...m, linhaId: `${p.operacaoId}-${itens.length}` });
-      }
-      if (itens.length > 150) throw new Error('Esta cautela já possui 150 linhas distintas. Abra outra cautela.');
-      alteracoes = {
-        materiais: itens, ...resumo(itens), totalAcrescimos: (c.totalAcrescimos || 0) + 1,
-        ...(!c.materiaisOriginais ? { materiaisOriginais: itensCautela(c) } : {})
-      };
-      movimentos = agruparMovimentos(novos); itensEvento = novos;
-      registro.assinatura = assinatura;
-      registro.militar = texto(p.militar, 'Militar que está cautelando');
     } else if (p.tipo === 'devolver' || p.tipo === 'excluir') {
       if (c.excluida) throw new Error('Cautela já excluída.');
       if (p.tipo === 'devolver') exigirAberta(c);
@@ -82,8 +64,10 @@ export async function salvarMovimentacao(db, p) {
         militar: texto(p.militar, 'Militar que cautelou'), om: texto(p.om, 'OM', 200, false)
       };
       registro.antes = Object.fromEntries(Object.keys(alteracoes).map(k => [k, c[k] || '']));
-      registro.depois = alteracoes;
-      registro.motivo = texto(p.motivo, 'Motivo da correção', 1000);
+      registro.depois = { ...alteracoes };
+      registro.assinatura = assinatura;
+      registro.militar = texto(p.militarRetirada ?? p.militar, 'Militar');
+      registro.motivo = texto(p.motivo, 'Motivo', 1000, false);
       if (!c.dadosOriginais) alteracoes.dadosOriginais = { ...registro.antes };
     } else if (p.tipo === 'assinar_devolucao') {
       if (!c.dataEntrega || c.assinaturaDevolucao || c.excluida) throw new Error('Não há assinatura de devolução pendente neste registro.');
@@ -91,7 +75,28 @@ export async function salvarMovimentacao(db, p) {
     } else if (p.tipo === 'assinar') {
       if (c.assinaturaCautela || c.excluida) throw new Error('A cautela já está assinada ou excluída.');
       alteracoes.assinaturaCautela = assinatura;
-    } else throw new Error('Operação inválida.');
+    } else if (p.tipo !== 'adicionar') throw new Error('Operação inválida.');
+
+    if (p.tipo === 'adicionar' || (p.tipo === 'editar' && p.itens?.length)) {
+      exigirAberta(c);
+      if (!c.assinaturaCautela) throw new Error('Colha primeiro a assinatura da retirada original.');
+      const novos = normalizarItens(p.itens);
+      const itens = itensCautela(c);
+      for (const m of novos) {
+        const atual = itens.find(i => i.materialId === m.materialId && i.nome === m.nome && i.estoqueControlado === m.estoqueControlado);
+        if (atual) { atual.quantidade += m.quantidade; atual.pendente += m.quantidade; }
+        else itens.push({ ...m, linhaId: `${p.operacaoId}-${itens.length}` });
+      }
+      if (itens.length > 150) throw new Error('Esta cautela já possui 150 linhas distintas. Abra outra cautela.');
+      alteracoes = {
+        ...alteracoes,
+        materiais: itens, ...resumo(itens), totalAcrescimos: (c.totalAcrescimos || 0) + 1,
+        ...(!c.materiaisOriginais ? { materiaisOriginais: itensCautela(c) } : {})
+      };
+      movimentos = agruparMovimentos(novos); itensEvento = novos;
+      registro.assinatura = assinatura;
+      registro.militar = texto(p.militarRetirada ?? p.militar, 'Militar');
+    }
 
     const snapshots = [];
     for (const [id, qtd] of movimentos) {

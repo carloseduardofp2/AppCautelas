@@ -44,15 +44,15 @@ export default function SeletorEstoque({ materiais = [], selecionados = [], onSe
           {!encontrados.length && <Text style={[s.muted,{padding:12}]}>Nenhum material encontrado.</Text>}
         </ScrollView>
       </View>}
-      <Text style={s.aviso}>{material ? `Disponível para adicionar: ${Math.max(0,disponivel)} unidade(s).` : 'Selecione um material cadastrado na Reserva.'}</Text>
+      <Text style={s.aviso}>{material ? `Disponível para adicionar: ${Math.max(0,disponivel)} unidade(s).` : 'Selecione um material.'}</Text>
     </> : <>
-      <Text style={[s.aviso,{color:'#93C5FD',backgroundColor:'#172C45'}]}>O item avulso fica registrado na cautela e não movimenta o estoque.</Text>
+      <Text style={[s.aviso,{color:'#93C5FD',backgroundColor:'#172C45'}]}>Item avulso não altera o estoque.</Text>
       <TextInput accessibilityLabel="Nome do material avulso" style={s.input} placeholder="Nome do material avulso" placeholderTextColor="#94A3B8" maxLength={200} value={nome} onChangeText={setNome} />
     </>}
     <View style={s.adicionarLinha}><View style={{width:100}}><Text style={s.label}>Quantidade</Text><TextInput accessibilityLabel="Quantidade a adicionar" keyboardType="numeric" style={[s.input,{marginBottom:0}]} value={quantidade} onChangeText={setQuantidade} /></View><TouchableOpacity accessibilityRole="button" style={s.adicionar} onPress={adicionar}><Text style={s.dourado}>+ Adicionar</Text></TouchableOpacity></View>
     {!!erro && <Text accessibilityRole="alert" style={s.erro}>{erro}</Text>}
     <View style={s.carrinho}>
-      {!selecionados.some(m=>m.nome?.trim()) && <Text style={[s.muted,{textAlign:'center',padding:12}]}>Nenhum material adicionado à cautela.</Text>}
+      {!selecionados.some(m=>m.nome?.trim()) && <Text style={[s.muted,{textAlign:'center',padding:12}]}>Nenhum material adicionado.</Text>}
       {selecionados.map((m,i) => !!m.nome?.trim() && <View key={i} style={s.item}><View style={{flex:1}}><Text style={s.nome}>{m.nome}</Text><Text style={s.muted}>{m.materialId ? `Estoque · ${m.caminhoExibicao || 'Início'}` : 'Item avulso'}</Text></View><Text style={s.qtd}>{m.quantidade} un.</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remover ${m.nome}`} onPress={()=>onRemove?.(i)} style={s.remover}><Text style={{color:'#FCA5A5',fontSize:20}}>×</Text></TouchableOpacity></View>)}
     </View>
   </View>;

@@ -6,7 +6,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { styles } from '../styles/MainStyles';
 
 export default function ModalAssinatura({
-  fechar, titulo = "Assinatura do militar que está cautelando", descricao = "",
+  fechar, titulo = "Assinatura do militar", descricao = "",
   handleAssinatura,
   tipoOperacao,
   novaObsEntrega,

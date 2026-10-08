@@ -13,23 +13,19 @@ export function gerarHtmlLivro(lista) {
     const original = c.dadosOriginais || c;
     const itens = c.materiaisOriginais || c.materiais;
     const historico = c.historico || [];
-    const acrescimos = historico.filter(h => h.tipo === 'adicionar');
+    const acrescimos = historico.filter(h => h.tipo === 'adicionar' || h.tipo === 'editar');
     let materiais = Array.isArray(itens) ? listaItens(itens) : `${escapar(c.material)} (${escapar(c.quantidade)})`;
     let assinaturaSaida = img(c.assinaturaCautela);
     acrescimos.forEach((h,i) => {
-      materiais += bloco(`<b>Acréscimo ${i+1} · ${escapar(hora(h))}</b>${listaItens(h.itens || [])}<div>Cautelado por: ${escapar(h.militar || original.militar || c.militar)}</div><div class="discreto">Militar da SecOp: ${escapar(h.operador || '-')}</div>`);
-      assinaturaSaida += bloco(`<span class="discreto">Acréscimo ${i+1}</span><br>${img(h.assinatura)}`);
+      materiais += bloco(`<b>${h.tipo === 'editar' ? 'Edição' : 'Acréscimo'} ${i+1} · ${escapar(hora(h))}</b>${listaItens(h.itens || [])}${h.tipo === 'editar' ? Object.keys(h.antes || {}).filter(k => h.antes[k] !== h.depois?.[k]).map(k => `<div>${escapar(rotulo[k] || k)}: ${escapar(valorCampo(k,h.antes[k]))} → ${escapar(valorCampo(k,h.depois?.[k]))}</div>`).join('') : ''}${h.motivo ? `<div>Motivo: ${escapar(h.motivo)}</div>` : ''}<div>Cautelado por: ${escapar(h.militar || (h.tipo === 'editar' ? 'Não registrado' : original.militar || c.militar))}</div><div class="discreto">Militar SecOp: ${escapar(h.operador || '-')}</div>`);
+      assinaturaSaida += bloco(`<span class="discreto">${h.tipo === 'editar' ? 'Edição' : 'Acréscimo'} ${i+1}</span><br>${h.tipo === 'editar' && !h.assinatura ? 'Registro anterior sem assinatura' : img(h.assinatura)}`);
     });
     let observacao = escapar(original.observacao || '-');
-    for (const h of historico.filter(h => h.tipo === 'editar')) {
-      const campos = Object.keys(h.antes || {}).filter(k => h.antes[k] !== h.depois?.[k]);
-      observacao += bloco(`<b>Correção · ${escapar(hora(h))}</b><div>${escapar(h.operador || '-')}</div>${campos.map(k => `<div>${escapar(rotulo[k] || k)}: ${escapar(valorCampo(k,h.antes[k]))} → ${escapar(valorCampo(k,h.depois?.[k]))}</div>`).join('')}${h.motivo ? `<div>${escapar(h.motivo)}</div>` : ''}`);
-    }
     let obsEntrega = escapar(c.obsEntrega || '-');
     let assinaturaRetorno = img(c.assinaturaDevolucao);
     historico.filter(h => h.tipo === 'devolver').forEach((h,i) => {
       obsEntrega += bloco(`<b>${h.completa ? 'Conclusão' : 'Parcial'} ${i+1} · ${escapar(hora(h))}</b><div>${escapar(h.operador || '-')}</div>${listaItens(h.itens || [])}${h.observacao ? `<div>${escapar(h.observacao)}</div>` : ''}`);
-      if (!h.completa) assinaturaRetorno += bloco(`<span class="discreto">Parcial ${i+1}</span><br>${img(h.assinatura)}`);
+      if (!h.completa) assinaturaRetorno += bloco(`<span class="discreto">Parcial ${i+1}</span><br>${h.tipo === 'editar' && !h.assinatura ? 'Registro anterior sem assinatura' : img(h.assinatura)}`);
     });
     const retirada = escapar(c.dataCautela) + (c.previsaoDevolucao ? bloco(`<b>Previsão de devolução</b><br>${escapar(formatarPrevisao(c.previsaoDevolucao))}`) : '');
     const extensa = (Array.isArray(itens) ? itens.length : 1) + acrescimos.reduce((n,h)=>n+(h.itens?.length || 0)+4,0) > 32;

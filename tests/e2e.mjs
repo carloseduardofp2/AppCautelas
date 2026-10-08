@@ -20,8 +20,8 @@ try{
  for(const icon of manifest.icons){const dimensions=await page.evaluate(src=>new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(`${i.naturalWidth}x${i.naturalHeight}`);i.onerror=reject;i.src=src;}),icon.src);assert.equal(dimensions,icon.sizes);}
 await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();
  await page.getByLabel('Abrir ações do Livro').click();await page.getByLabel('Nova cautela',{exact:true}).click();
- await page.getByPlaceholder('Mil Sec Op (Quem está entregando o material)').fill('Cb Operador');
- await page.getByPlaceholder('Militar que está pegando (ex: Cb Fulano)').fill('Sd Teste E2E');
+ await page.getByPlaceholder('Militar SecOp').fill('Cb Operador');
+ await page.getByPlaceholder('Militar').fill('Sd Teste E2E');
  await page.getByLabel('Previsão de devolução (opcional)').fill('2026-10-05');
  await page.getByLabel('Selecionar material do estoque').click();await page.getByLabel('Pesquisar material no estoque').fill('radio');await page.getByRole('button',{name:'Rádio de teste, disponível: 10, Início',exact:true}).click();
  await page.getByLabel('Quantidade a adicionar').fill('3');await page.getByText('+ Adicionar',{exact:true}).click();
@@ -31,18 +31,18 @@ await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();
  await assinar();await page.getByText('Sd Teste E2E',{exact:true}).waitFor();
  let c=(await getDocs(collection(db,'cautelas'))).docs.find(d=>d.data().militar==='Sd Teste E2E');assert.ok(c);const id=c.id;
  let stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,7);assert.equal(stock.quantidadeCautelada,3);
- await page.getByText('+ Material',{exact:true}).click();await page.getByLabel('Militar que está cautelando').fill('Sd Outro Militar');await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Segundo');await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${out}/acrescimo-dois-militares.png`});await page.setViewportSize({width:1280,height:900});
+ assert.equal(await page.getByText('+ Material',{exact:true}).count(),0);await page.getByText('Editar',{exact:true}).click();await page.getByLabel('Militar').fill('Sd Outro Militar');await page.getByLabel('Militar SecOp').fill('Cb Segundo');await page.setViewportSize({width:390,height:844});await page.screenshot({path:`${out}/acrescimo-dois-militares.png`});await page.setViewportSize({width:1280,height:900});
  await page.getByLabel('Selecionar material do estoque').click();await page.getByRole('button',{name:'Rádio de teste, disponível: 7, Início',exact:true}).click();await page.getByLabel('Quantidade a adicionar').fill('2');await page.getByText('+ Adicionar',{exact:true}).click();await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();
  await page.getByText('Acréscimos assinados: 1',{exact:true}).waitFor();stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,5);
- await page.getByText('Editar',{exact:true}).click();await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Corretor');await page.getByLabel('Motivo da correção').fill('Complementar observações');await page.getByLabel('Observação',{exact:true}).fill('Material conferido');await page.getByText('Salvar com histórico',{exact:true}).click();await page.getByText('Material conferido',{exact:true}).waitFor();
- await page.getByText('Pendentes',{exact:true}).click();await page.getByText('Selecionar devolução / detalhes',{exact:true}).click();await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Retorno');await page.getByLabel('Devolver Rádio de teste').fill('1');await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,6);assert.equal(stock.quantidadeCautelada,4);
- await page.getByText('Selecionar devolução / detalhes',{exact:true}).click();await page.getByLabel('Militar da SecOp responsável pelo lançamento').fill('Cb Final');await page.getByText('Selecionar toda a quantidade pendente',{exact:true}).click();await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();await page.getByText('Tudo certo! Nenhum material pendente no momento.',{exact:true}).waitFor();stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,10);assert.equal(stock.quantidadeCautelada,0);
+ await page.getByText('Editar',{exact:true}).click();await page.getByLabel('Militar SecOp').fill('Cb Corretor');await page.getByLabel('Observação',{exact:true}).fill('Material conferido');await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();await page.getByText('Material conferido',{exact:true}).waitFor();
+ await page.getByText('Pendentes',{exact:true}).click();await page.getByText('Selecionar devolução / detalhes',{exact:true}).click();await page.getByLabel('Militar SecOp').fill('Cb Retorno');await page.getByLabel('Devolver Rádio de teste').fill('1');await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,6);assert.equal(stock.quantidadeCautelada,4);
+ await page.getByText('Selecionar devolução / detalhes',{exact:true}).click();await page.getByLabel('Militar SecOp').fill('Cb Final');await page.getByText('Selecionar tudo',{exact:true}).click();await page.getByText('Conferir e assinar',{exact:true}).click();await assinar();await page.getByText('Tudo certo! Nenhum material pendente no momento.',{exact:true}).waitFor();stock=(await getDoc(doc(db,'materiais','e2e-radio'))).data();assert.equal(stock.quantidade,10);assert.equal(stock.quantidadeCautelada,0);
  await page.getByText('Livro',{exact:true}).click();assert.equal(await page.getByText('+ Material',{exact:true}).count(),0);
  assert.equal(await page.getByText('Detalhes / PDF',{exact:true}).count(),0);
  await page.getByLabel('Abrir ações do Livro').click();await page.getByText('📄',{exact:true}).click();
  const popupPromise=page.waitForEvent('popup');await page.getByText('Todas as Cautelas',{exact:true}).click();
- const popup=await popupPromise;await popup.getByText(/Acréscimo 1 ·/).waitFor();
- await popup.getByText('Cautelado por: Sd Outro Militar',{exact:true}).waitFor();await popup.getByText('Militar da SecOp: Cb Segundo',{exact:true}).waitFor();await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
+ const popup=await popupPromise;await popup.getByText(/Edição 1 ·/).waitFor();
+ await popup.getByText('Cautelado por: Sd Outro Militar',{exact:true}).waitFor();await popup.getByText('Militar SecOp: Cb Segundo',{exact:true}).waitFor();await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
 
  for(const [w,h] of [[360,800],[768,1024],[1280,900]]){await page.setViewportSize({width:w,height:h});await page.reload();await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();await page.screenshot({path:`${out}/livro-${w}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
  await page.getByText('Materiais',{exact:true}).click();await page.getByText('Rádio de teste',{exact:true}).waitFor();
@@ -69,7 +69,7 @@ await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();
  // Prévia com dados fictícios; pesquisa sem acento e por prateleira, limites e avulso.
  for(const [id,nome,q,p] of [['banner','Banner institucional',8,'Prateleira 2'],['pulpito','Púlpito',2,'Prateleira 1'],['megafone','Megafone',0,'Prateleira 3']]) await setDoc(doc(db,'materiais',id),{item:nome,quantidade:q,quantidadeCautelada:0,quantidadeTotal:q,path:['Sala',p],isFolder:false});
  await page.getByText('Livro',{exact:true}).click();await page.getByLabel('Abrir ações do Livro').click();await page.getByLabel('Nova cautela',{exact:true}).click();
- await page.getByPlaceholder('Mil Sec Op (Quem está entregando o material)').fill('Cb Operador');await page.getByPlaceholder('Militar que está pegando (ex: Cb Fulano)').fill('Sd Exemplo');
+ await page.getByPlaceholder('Militar SecOp').fill('Cb Operador');await page.getByPlaceholder('Militar').fill('Sd Exemplo');
  await page.getByLabel('Selecionar material do estoque').click();await page.getByLabel('Pesquisar material no estoque').fill('pulpito');
  await page.getByRole('button',{name:'Púlpito, disponível: 2, Sala › Prateleira 1',exact:true}).click();
  await page.getByLabel('Quantidade a adicionar').fill('3');await page.getByText('+ Adicionar',{exact:true}).click();await page.getByText('Há somente 2 unidade(s) disponível(is) para adicionar.',{exact:true}).waitFor();

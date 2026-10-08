@@ -95,7 +95,7 @@ test('ajuste manual auditado, saldo corrigido e proteção contra edição conco
 test('acréscimo identifica quem cautela e a SecOp sem mudar o militar original',async()=>{
  await material('duas-identidades',4);
  await salvar({tipo:'criar',operacaoId:'nomes-cautela',itens:[item('duas-identidades',1)]});
- await assert.rejects(salvar({tipo:'adicionar',cautelaId:'nomes-cautela',operacaoId:'nome-vazio',militar:' ',itens:[item('duas-identidades',1)]}),/Militar que está cautelando/);
+ await assert.rejects(salvar({tipo:'adicionar',cautelaId:'nomes-cautela',operacaoId:'nome-vazio',militar:' ',itens:[item('duas-identidades',1)]}),/Militar/);
  await saldos('duas-identidades',3,1);
  await salvar({tipo:'adicionar',cautelaId:'nomes-cautela',operacaoId:'nomes-acrescimo',militar:'Sd Outro Militar',operador:'Cb Responsável SecOp',itens:[item('duas-identidades',1)]});
  const cautela=(await getDoc(doc(a.db,'cautelas','nomes-cautela'))).data();
@@ -103,6 +103,30 @@ test('acréscimo identifica quem cautela e a SecOp sem mudar o militar original'
  assert.equal(cautela.militar,'Sd Torcato');assert.equal(evento.militar,'Sd Outro Militar');assert.equal(evento.operador,'Cb Responsável SecOp');
  const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');
  const html=gerarHtmlLivro([{...cautela,historico:[evento]}]);
- assert.ok(html.includes('Cautelado por: Sd Outro Militar'));assert.ok(html.includes('Militar da SecOp: Cb Responsável SecOp'));
+ assert.ok(html.includes('Cautelado por: Sd Outro Militar'));assert.ok(html.includes('Militar SecOp: Cb Responsável SecOp'));
  await saldos('duas-identidades',2,2);
+});
+
+test('edição unificada assinada é atômica, idempotente e preserva titular e originais',async()=>{
+ await material('unificado',10);
+ await salvar({tipo:'criar',operacaoId:'unificada',itens:[item('unificado',3)]});
+ const edicao={tipo:'editar',cautelaId:'unificada',operacaoId:'unificada-e1',revisao:1,militarRetirada:'Sd Retirante',operador:'Cb SecOp',observacao:'Conferido',itens:[item('unificado',2)]};
+ await assert.rejects(salvar({...edicao,militarRetirada:''}));
+ await assert.rejects(salvar({...edicao,assinatura:''}));await saldos('unificado',7,3);
+ await assert.rejects(salvar({...edicao,itens:[item('unificado',8)]}));
+ assert.equal((await getDoc(doc(a.db,'cautelas','unificada'))).data().observacao,'');
+ assert.equal((await getDoc(doc(a.db,'cautelas','unificada','historico',edicao.operacaoId))).exists(),false);
+ await salvar(edicao);await salvar(edicao);await saldos('unificado',5,5);
+ let c=(await getDoc(doc(a.db,'cautelas','unificada'))).data();
+ assert.equal(c.militar,'Sd Torcato');assert.equal(c.observacao,'Conferido');assert.equal(c.materiaisOriginais[0].quantidade,3);
+ const h=(await getDoc(doc(a.db,'cautelas','unificada','historico',edicao.operacaoId))).data();
+ assert.equal(h.assinatura,assinatura);assert.equal(h.militar,'Sd Retirante');assert.equal(h.operador,'Cb SecOp');assert.equal(h.itens[0].quantidade,2);
+ const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');const html=gerarHtmlLivro([{...c,historico:[h]}]);
+ for(const texto of ['Edição 1','unificado (3)','unificado (2)','Sd Retirante','Militar SecOp: Cb SecOp','Conferido']) assert.ok(html.includes(texto),texto);
+ assert.equal((html.match(/<tr/g)||[]).length,2);assert.equal((html.match(/<img /g)||[]).length,2);
+ await salvar({...edicao,operacaoId:'unificada-e2',revisao:c.revisao,itens:[],observacao:'Correção sem retirada'});await saldos('unificado',5,5);
+ c=(await getDoc(doc(a.db,'cautelas','unificada'))).data();
+ await salvar({tipo:'devolver',cautelaId:'unificada',operacaoId:'unificada-d',quantidades:Object.fromEntries(c.materiais.map(m=>[m.linhaId,m.pendente]))});await saldos('unificado',10,0);
+ c=(await getDoc(doc(a.db,'cautelas','unificada'))).data();
+ await assert.rejects(salvar({...edicao,operacaoId:'unificada-fechada',revisao:c.revisao}),/finalizada/);await saldos('unificado',10,0);
 });
