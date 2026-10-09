@@ -42,7 +42,7 @@ await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();
  await page.getByLabel('Abrir ações do Livro').click();await page.getByText('📄',{exact:true}).click();
  const popupPromise=page.waitForEvent('popup');await page.getByText('Todas as Cautelas',{exact:true}).click();
  const popup=await popupPromise;await popup.getByText(/Edição 1 ·/).waitFor();
- await popup.getByText('Cautelado por: Sd Outro Militar',{exact:true}).waitFor();await popup.getByText('Militar SecOp: Cb Segundo',{exact:true}).waitFor();await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
+ await popup.getByText('Militar: Sd Outro Militar',{exact:true}).waitFor();await popup.getByText('Militar SecOp: Cb Segundo',{exact:true}).waitFor();await popup.pdf({path:`${out}/livro-completo.pdf`,preferCSSPageSize:true,printBackground:true});await popup.close();
 
  for(const [w,h] of [[360,800],[768,1024],[1280,900]]){await page.setViewportSize({width:w,height:h});await page.reload();await page.getByText('LIVRO DE CAUTELAS',{exact:true}).waitFor();await page.screenshot({path:`${out}/livro-${w}.png`,fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
  await page.getByText('Materiais',{exact:true}).click();await page.getByText('Rádio de teste',{exact:true}).waitFor();

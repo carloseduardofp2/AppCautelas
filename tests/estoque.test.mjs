@@ -44,5 +44,18 @@ test('PDF mantém mais de seis materiais e acréscimos na mesma linha sem duplic
  assert.ok(!h.includes('ORIGINAIS'));assert.ok(!h.includes('Qtd original'));
  for(const m of itens) assert.ok(h.includes(`${m.nome} (1)`));
  assert.equal((h.match(/Extra \(2\)/g)||[]).length,1);
- assert.ok(h.includes('Cautelado por: Sd Exemplo'));assert.ok(h.includes('Militar SecOp: Cb SecOp'));
+ assert.ok(h.includes('Militar:</b> Sd Exemplo'));assert.ok(h.includes('Militar SecOp:</b> Cb SecOp'));
+});
+
+test('PDF apresenta observação vigente uma vez e mantém edição identificada',()=>{
+ const c={militar:'Sd Exemplo',observacao:'Texto corrigido',dadosOriginais:{militar:'Sd Exemplo',observacao:'Texto antigo repetido'},historico:[{tipo:'editar',militar:'Sd Assinante',operador:'Cb Operador',antes:{observacao:'Texto antigo repetido'},depois:{observacao:'Texto corrigido'},motivo:'Conferência'}]};
+ const html=gerarHtmlLivro([c]);
+ assert.equal((html.match(/Texto corrigido/g)||[]).length,1);
+ assert.equal((html.match(/Texto antigo repetido/g)||[]).length,1);
+ const colunas=html.match(/<tbody>([\s\S]*)<\/tbody>/)[1].split('</td>');
+ assert.ok(!colunas[1].includes('Texto corrigido'));assert.ok(colunas[2].includes('Texto corrigido'));
+ assert.ok(colunas[4].includes('Militar SecOp:</b> Cb Operador'));
+ for(const label of ['Observação','Militar','Militar SecOp','Motivo']) assert.ok(html.includes(`<b>${label}:</b>`));
+ assert.ok(html.includes('Edição 1'));assert.equal(c.dadosOriginais.observacao,'Texto antigo repetido');
+ const vazio=gerarHtmlLivro([{...c,observacao:'',historico:[{...c.historico[0],depois:{observacao:''}}]}]);assert.ok(vazio.includes('Sem observação'));
 });

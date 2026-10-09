@@ -103,7 +103,7 @@ test('acréscimo identifica quem cautela e a SecOp sem mudar o militar original'
  assert.equal(cautela.militar,'Sd Torcato');assert.equal(evento.militar,'Sd Outro Militar');assert.equal(evento.operador,'Cb Responsável SecOp');
  const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');
  const html=gerarHtmlLivro([{...cautela,historico:[evento]}]);
- assert.ok(html.includes('Cautelado por: Sd Outro Militar'));assert.ok(html.includes('Militar SecOp: Cb Responsável SecOp'));
+ assert.ok(html.includes('Militar:</b> Sd Outro Militar'));assert.ok(html.includes('Militar SecOp:</b> Cb Responsável SecOp'));
  await saldos('duas-identidades',2,2);
 });
 
@@ -122,7 +122,7 @@ test('edição unificada assinada é atômica, idempotente e preserva titular e 
  const h=(await getDoc(doc(a.db,'cautelas','unificada','historico',edicao.operacaoId))).data();
  assert.equal(h.assinatura,assinatura);assert.equal(h.militar,'Sd Retirante');assert.equal(h.operador,'Cb SecOp');assert.equal(h.itens[0].quantidade,2);
  const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');const html=gerarHtmlLivro([{...c,historico:[h]}]);
- for(const texto of ['Edição 1','unificado (3)','unificado (2)','Sd Retirante','Militar SecOp: Cb SecOp','Conferido']) assert.ok(html.includes(texto),texto);
+ for(const texto of ['Edição 1','unificado (3)','unificado (2)','Sd Retirante','Militar SecOp:</b> Cb SecOp','Conferido']) assert.ok(html.includes(texto),texto);
  assert.equal((html.match(/<tr/g)||[]).length,2);assert.equal((html.match(/<img /g)||[]).length,2);
  await salvar({...edicao,operacaoId:'unificada-e2',revisao:c.revisao,itens:[],observacao:'Correção sem retirada'});await saldos('unificado',5,5);
  c=(await getDoc(doc(a.db,'cautelas','unificada'))).data();

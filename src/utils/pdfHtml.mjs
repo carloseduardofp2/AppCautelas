@@ -1,8 +1,6 @@
 import { formatarPrevisao } from './estoque.mjs';
 export const escapar = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const img = s => typeof s === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(s) ? `<img alt="Assinatura" src="${s}" class="assinatura">` : 'Pendente';
-const rotulo = { militar: 'Militar', om: 'OM', observacao: 'Observação', previsaoDevolucao: 'Previsão de devolução' };
-const valorCampo = (k,v) => k === 'previsaoDevolucao' && v ? formatarPrevisao(v) : v || '(vazio)';
 const hora = h => h?.em?.toDate ? h.em.toDate().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : h?.em?.seconds ? new Date(h.em.seconds * 1000).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Horário não disponível';
 const listaItens = itens => itens.map(m => `<div class="item">${escapar(m.nome)} (${escapar(m.quantidade)})</div>`).join('');
 const bloco = conteudo => `<div class="evento">${conteudo}</div>`;
@@ -16,20 +14,30 @@ export function gerarHtmlLivro(lista) {
     const acrescimos = historico.filter(h => h.tipo === 'adicionar' || h.tipo === 'editar');
     let materiais = Array.isArray(itens) ? listaItens(itens) : `${escapar(c.material)} (${escapar(c.quantidade)})`;
     let assinaturaSaida = img(c.assinaturaCautela);
-    acrescimos.forEach((h,i) => {
-      materiais += bloco(`<b>${h.tipo === 'editar' ? 'Edição' : 'Acréscimo'} ${i+1} · ${escapar(hora(h))}</b>${listaItens(h.itens || [])}${h.tipo === 'editar' ? Object.keys(h.antes || {}).filter(k => h.antes[k] !== h.depois?.[k]).map(k => `<div>${escapar(rotulo[k] || k)}: ${escapar(valorCampo(k,h.antes[k]))} → ${escapar(valorCampo(k,h.depois?.[k]))}</div>`).join('') : ''}${h.motivo ? `<div>Motivo: ${escapar(h.motivo)}</div>` : ''}<div>Cautelado por: ${escapar(h.militar || (h.tipo === 'editar' ? 'Não registrado' : original.militar || c.militar))}</div><div class="discreto">Militar SecOp: ${escapar(h.operador || '-')}</div>`);
-      assinaturaSaida += bloco(`<span class="discreto">${h.tipo === 'editar' ? 'Edição' : 'Acréscimo'} ${i+1}</span><br>${h.tipo === 'editar' && !h.assinatura ? 'Registro anterior sem assinatura' : img(h.assinatura)}`);
-    });
+    let militar = `${escapar(original.militar)}<br><span class="discreto">${escapar(original.om || '-')}</span>`;
+    let secop = escapar(c.milSecOpCautela);
     let observacao = escapar(original.observacao || '-');
+    const previsaoOriginal = Object.hasOwn(original, 'previsaoDevolucao') ? original.previsaoDevolucao : c.previsaoDevolucao;
+    let retirada = escapar(c.dataCautela) + (previsaoOriginal ? bloco(`<b>Previsão de devolução:</b><br>${escapar(formatarPrevisao(previsaoOriginal))}`) : '');
+    acrescimos.forEach((h,i) => {
+      const titulo = `<b>${h.tipo === 'editar' ? 'Edição' : 'Acréscimo'} ${i+1}</b>`;
+      const mudou = k => h.antes && Object.hasOwn(h.antes,k) && h.antes[k] !== h.depois?.[k];
+      if (h.itens?.length) materiais += bloco(`${titulo}${listaItens(h.itens)}`);
+      const nome = h.militar || (h.tipo === 'editar' ? 'Não registrado' : original.militar || c.militar);
+      militar += bloco(`${titulo}<div><b>Militar:</b> ${escapar(nome)}</div>${mudou('militar') ? `<div><b>Titular:</b> ${escapar(h.depois.militar)}</div>` : ''}${mudou('om') ? `<div><b>OM:</b> ${escapar(h.depois.om || '—')}</div>` : ''}`);
+      secop += bloco(`${titulo}<div><b>Militar SecOp:</b> ${escapar(h.operador || '-')}</div>`);
+      retirada += bloco(`${titulo}<div><b>Data:</b> ${escapar(hora(h))}</div>${mudou('previsaoDevolucao') ? `<div><b>Previsão de devolução:</b> ${escapar(h.depois.previsaoDevolucao ? formatarPrevisao(h.depois.previsaoDevolucao) : 'Sem previsão')}</div>` : ''}`);
+      if (mudou('observacao') || h.motivo) observacao += bloco(`${titulo}${mudou('observacao') ? `<div><b>Observação:</b> ${escapar(h.depois.observacao || 'Sem observação')}</div>` : ''}${h.motivo ? `<div><b>Motivo:</b> ${escapar(h.motivo)}</div>` : ''}`);
+      assinaturaSaida += bloco(`${titulo}<br>${h.tipo === 'editar' && !h.assinatura ? 'Registro anterior sem assinatura' : img(h.assinatura)}`);
+    });
     let obsEntrega = escapar(c.obsEntrega || '-');
     let assinaturaRetorno = img(c.assinaturaDevolucao);
     historico.filter(h => h.tipo === 'devolver').forEach((h,i) => {
-      obsEntrega += bloco(`<b>${h.completa ? 'Conclusão' : 'Parcial'} ${i+1} · ${escapar(hora(h))}</b><div>${escapar(h.operador || '-')}</div>${listaItens(h.itens || [])}${h.observacao ? `<div>${escapar(h.observacao)}</div>` : ''}`);
-      if (!h.completa) assinaturaRetorno += bloco(`<span class="discreto">Parcial ${i+1}</span><br>${h.tipo === 'editar' && !h.assinatura ? 'Registro anterior sem assinatura' : img(h.assinatura)}`);
+      obsEntrega += bloco(`<b>${h.completa ? 'Conclusão' : 'Parcial'} ${i+1} · ${escapar(hora(h))}</b><div><b>Militar SecOp:</b> ${escapar(h.operador || '-')}</div>${listaItens(h.itens || [])}${h.observacao && (!h.completa || h.observacao !== c.obsEntrega) ? `<div><b>Observação:</b> ${escapar(h.observacao)}</div>` : ''}`);
+      if (!h.completa) assinaturaRetorno += bloco(`<b class="discreto">Parcial ${i+1}</b><br>${h.tipo === 'editar' && !h.assinatura ? 'Registro anterior sem assinatura' : img(h.assinatura)}`);
     });
-    const retirada = escapar(c.dataCautela) + (c.previsaoDevolucao ? bloco(`<b>Previsão de devolução</b><br>${escapar(formatarPrevisao(c.previsaoDevolucao))}`) : '');
     const extensa = (Array.isArray(itens) ? itens.length : 1) + acrescimos.reduce((n,h)=>n+(h.itens?.length || 0)+4,0) > 32;
-    return `<tr${extensa ? ' class="extensa"' : ''}><td>${escapar(original.militar)}<br><span class="discreto">${escapar(original.om || '-')}</span></td><td>${materiais}</td><td>${observacao}</td><td>${retirada}</td><td>${escapar(c.milSecOpCautela)}</td><td class="assinaturas">${assinaturaSaida}</td><td>${escapar(c.dataEntrega || 'Pendente')}</td><td>${escapar(c.milSecOp || '-')}</td><td>${obsEntrega}</td><td class="assinaturas">${assinaturaRetorno}</td></tr>`;
+    return `<tr${extensa ? ' class="extensa"' : ''}><td>${militar}</td><td>${materiais}</td><td>${observacao}</td><td>${retirada}</td><td>${secop}</td><td class="assinaturas">${assinaturaSaida}</td><td>${escapar(c.dataEntrega || 'Pendente')}</td><td>${escapar(c.milSecOp || '-')}</td><td>${obsEntrega}</td><td class="assinaturas">${assinaturaRetorno}</td></tr>`;
   }).join('');
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Livro de Cautelas — SecOp</title><style>
     @page { size: A4 landscape; margin: 8mm; } body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; }
