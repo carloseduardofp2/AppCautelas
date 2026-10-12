@@ -34,7 +34,7 @@ export default function MainContent() {
         novoMilitar, setNovoMilitar,
         novaOm, setNovaOm,
         materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
-        novaObs, setNovaObs,
+        novaObs, setNovaObs, novasObservacoes, setNovasObservacoes,
         novoMilSecOpCautela, setNovoMilSecOpCautela,
         tipoOperacao, setTipoOperacao,
         idCautelaParaAssinar, setIdCautelaParaAssinar,
@@ -211,7 +211,7 @@ export default function MainContent() {
                     adicionarLinhaMaterial={adicionarLinhaMaterial}
                     removerLinhaMaterial={removerLinhaMaterial}
                     atualizarLinhaMaterial={atualizarLinhaMaterial}
-                    novaObs={novaObs} setNovaObs={setNovaObs}
+                    novasObservacoes={novasObservacoes} setNovasObservacoes={setNovasObservacoes}
                     novoMilSecOpCautela={novoMilSecOpCautela} setNovoMilSecOpCautela={setNovoMilSecOpCautela}
                     dataSelecionada={dataSelecionada} mostrarCalendario={mostrarCalendario}
                     setMostrarCalendario={setMostrarCalendario} aoMudarData={aoMudarData}

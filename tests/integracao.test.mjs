@@ -103,7 +103,7 @@ test('acréscimo identifica quem cautela e a SecOp sem mudar o militar original'
  assert.equal(cautela.militar,'Sd Torcato');assert.equal(evento.militar,'Sd Outro Militar');assert.equal(evento.operador,'Cb Responsável SecOp');
  const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');
  const html=gerarHtmlLivro([{...cautela,historico:[evento]}]);
- assert.ok(html.includes('Militar:</b> Sd Outro Militar'));assert.ok(html.includes('Militar SecOp:</b> Cb Responsável SecOp'));
+ assert.ok(html.includes('>Sd Outro Militar</td>'));assert.ok(html.includes('>Cb Responsável SecOp</td>'));
  await saldos('duas-identidades',2,2);
 });
 
@@ -122,11 +122,53 @@ test('edição unificada assinada é atômica, idempotente e preserva titular e 
  const h=(await getDoc(doc(a.db,'cautelas','unificada','historico',edicao.operacaoId))).data();
  assert.equal(h.assinatura,assinatura);assert.equal(h.militar,'Sd Retirante');assert.equal(h.operador,'Cb SecOp');assert.equal(h.itens[0].quantidade,2);
  const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');const html=gerarHtmlLivro([{...c,historico:[h]}]);
- for(const texto of ['Edição 1','unificado (3)','unificado (2)','Sd Retirante','Militar SecOp:</b> Cb SecOp','Conferido']) assert.ok(html.includes(texto),texto);
- assert.equal((html.match(/<tr/g)||[]).length,2);assert.equal((html.match(/<img /g)||[]).length,2);
+ for(const texto of ['Edição 1','unificado</td><td class="centro">3','Sd Retirante','>Cb SecOp</td>','Conferido']) assert.ok(html.includes(texto),texto);
+ assert.match(html,/unificado(?: <b[^>]*>[^<]*<\/b>)?<\/td><td class="centro">2/);assert.equal((html.match(/<tbody class="operacao">/g)||[]).length,2);assert.equal((html.match(/<img /g)||[]).length,2);
  await salvar({...edicao,operacaoId:'unificada-e2',revisao:c.revisao,itens:[],observacao:'Correção sem retirada'});await saldos('unificado',5,5);
  c=(await getDoc(doc(a.db,'cautelas','unificada'))).data();
  await salvar({tipo:'devolver',cautelaId:'unificada',operacaoId:'unificada-d',quantidades:Object.fromEntries(c.materiais.map(m=>[m.linhaId,m.pendente]))});await saldos('unificado',10,0);
  c=(await getDoc(doc(a.db,'cautelas','unificada'))).data();
  await assert.rejects(salvar({...edicao,operacaoId:'unificada-fechada',revisao:c.revisao}),/finalizada/);await saldos('unificado',10,0);
+});
+
+test('OBS independentes: adição, correção auditada, concorrência e PDF sem repetição',async()=>{
+ const {carregarHistorico}=await import('../src/services/cautelaService.js');
+ const {gerarHtmlLivro}=await import('../src/utils/pdfHtml.mjs');
+ await material('insignia',10);
+ const cautelaId='obs-numeradas';
+ await salvar({tipo:'criar',operacaoId:cautelaId,itens:[item('insignia',3)],observacoes:[{texto:'Duas da OM A; uma da OM B.',material:'insignia'},{texto:'Entrega para a formatura.',material:''}]});
+ const ler=async()=>(await getDoc(doc(a.db,'cautelas',cautelaId))).data();
+ let c=await ler();assert.equal(c.observacoes.length,2);
+ const edit={tipo:'editar',cautelaId,operacaoId:'obs-adicao',revisao:c.revisao,militarRetirada:'Sd Segundo',observacoes:[...c.observacoes,{texto:'Uma da OM C.',material:'insignia'}],itens:[item('insignia',1)]};
+ await salvar(edit);await salvar(edit);await saldos('insignia',6,4);
+ c=await ler();assert.equal(c.observacoes.length,3);assert.equal(c.observacoes[2].numero,3);
+ await assert.rejects(salvar({...edit,operacaoId:'obs-stale'}),/outro aparelho/);
+ const notas=c.observacoes.map((o,i)=>i===0?{...o,texto:'Três da OM A.'}:o);
+ await salvar({...edit,operacaoId:'obs-correcao',revisao:c.revisao,observacoes:notas,itens:[]});await saldos('insignia',6,4);
+ c=await ler();const historico=await carregarHistorico(a.db,cautelaId);
+ const correcao=historico.find(h=>h.id==='obs-correcao');
+ assert.equal(correcao.observacoesAlteradas.length,1);assert.equal(correcao.observacoesAlteradas[0].antes.texto,'Duas da OM A; uma da OM B.');
+ const html=gerarHtmlLivro([{...c,id:cautelaId,historico}]);
+ for(const t of ['Três da OM A.','Entrega para a formatura.','Uma da OM C.'])assert.equal(html.split(t).length-1,1,t);
+ assert.ok(!html.includes('Duas da OM A'));assert.ok(html.includes('corrigida na Edição 2'));assert.equal((html.match(/<img /g)||[]).length,3);
+ assert.ok(html.includes('OBS 3'));assert.equal(c.assinaturaCautela,assinatura);
+ for(const observacoes of [c.observacoes.slice(1),[...c.observacoes,{texto:'',material:''}],[c.observacoes[1],c.observacoes[0],c.observacoes[2]]])await assert.rejects(salvar({...edit,operacaoId:'obs-invalid',revisao:c.revisao,observacoes,itens:[]}));
+ await assert.rejects(salvar({...edit,operacaoId:'obs-old-client',revisao:c.revisao,observacoes:undefined,observacao:'Substituir tudo',itens:[]}),/Atualize/);
+ await salvar({...edit,operacaoId:'obs-limpar',revisao:c.revisao,observacoes:c.observacoes.map((o,i)=>i===1?{...o,texto:''}:o),itens:[]});
+ c=await ler();assert.equal(c.observacoes[1].numero,2);assert.equal(c.observacoes[1].texto,'');await saldos('insignia',6,4);
+ await salvar({tipo:'devolver',cautelaId,operacaoId:'obs-retorno',militarRetirada:'Sd Devolvente',observacao:'Conferidas no retorno.',quantidades:Object.fromEntries(c.materiais.map(m=>[m.linhaId,m.pendente]))});
+ c=await ler();const retorno=await carregarHistorico(a.db,cautelaId);await saldos('insignia',10,0);
+ const pdfFinal=gerarHtmlLivro([{...c,id:cautelaId,historico:retorno}]);
+ assert.equal(pdfFinal.split('Conferidas no retorno.').length-1,1);assert.ok(pdfFinal.includes('Sd Devolvente'));assert.equal((pdfFinal.match(/<img /g)||[]).length,5);
+});
+
+test('OBS antigas são preservadas ao acrescentar uma nota nova',async()=>{
+ const {observacoesCautela}=await import('../src/utils/observacoes.mjs');
+ const cautelaId='obs-legado';const antigo={militar:'Sd Antigo',om:'Cia',observacao:'Detalhes originais.',dataCautela:'01/09/2026',material:'Mesa',quantidade:1,assinaturaCautela:assinatura};
+ await setDoc(doc(a.db,'cautelas',cautelaId),antigo);
+ const antes=(await getDoc(doc(a.db,'cautelas',cautelaId))).data();const notas=observacoesCautela(antes);
+ assert.equal(antes.observacoes,undefined);assert.equal(notas[0].numero,1);
+ await salvar({tipo:'editar',cautelaId,operacaoId:'obs-legado-edit',revisao:0,militar:'Sd Antigo',observacoes:[...notas,{texto:'Detalhes adicionais.',material:''}]});
+ const c=(await getDoc(doc(a.db,'cautelas',cautelaId))).data();
+ assert.equal(c.observacoes[0].texto,antigo.observacao);assert.equal(c.observacoes[1].numero,2);assert.equal(c.dadosOriginais.observacao,antigo.observacao);assert.equal(c.assinaturaCautela,assinatura);
 });

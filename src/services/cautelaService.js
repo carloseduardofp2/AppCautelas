@@ -1,3 +1,4 @@
+import { observacoesCautela, prepararObservacoes } from '../utils/observacoes.mjs';
 import { collection, doc, getDocs, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { normalizarItens, itensCautela, agruparMovimentos, movimentar, prepararDevolucao, texto, validarPrevisao, validarAssinatura, limiteDocumento } from '../utils/estoque.mjs';
 
@@ -33,10 +34,13 @@ export async function salvarMovimentacao(db, p) {
         estoqueBaixado: itens.some(m => m.estoqueControlado), estoqueDevolvido: false,
         schemaVersion: 2, revisao: 1, totalAcrescimos: 0, createdAt: serverTimestamp(), createdBy: uid
       };
+      const notas = prepararObservacoes({}, p.observacoes ?? observacoesCautela({observacao:p.observacao}), p.operacaoId);
+      alteracoes.observacoes = notas.lista; alteracoes.observacao = notas.resumo;
+      registro.observacoesAlteradas = notas.alteradas;
       movimentos = agruparMovimentos(itens); itensEvento = itens;
     } else if (p.tipo === 'devolver' || p.tipo === 'excluir') {
       if (c.excluida) throw new Error('Cautela já excluída.');
-      if (p.tipo === 'devolver') exigirAberta(c);
+      if (p.tipo === 'devolver') { exigirAberta(c); registro.militar = texto(p.militarRetirada ?? p.militar ?? c.militar, 'Militar'); }
       if (!c.dataEntrega && c.estoqueDevolvido !== true) {
         const solicitadas = p.tipo === 'excluir'
           ? Object.fromEntries(itensCautela(c).map(m => [m.linhaId, m.pendente])) : p.quantidades;
@@ -59,12 +63,23 @@ export async function salvarMovimentacao(db, p) {
       if (c.excluida) throw new Error('Cautela excluída.');
       if ((c.revisao || 0) !== p.revisao) throw new Error('A cautela foi modificada em outro aparelho. Reabra a edição.');
       alteracoes = {
-        observacao: texto(p.observacao, 'Observação', 2000, false),
+        observacao: p.observacoes !== undefined ? (c.observacao || '') : texto(p.observacao, 'Observação', 2000, false),
         previsaoDevolucao: validarPrevisao(p.previsaoDevolucao),
         militar: texto(p.militar, 'Militar que cautelou'), om: texto(p.om, 'OM', 200, false)
       };
-      registro.antes = Object.fromEntries(Object.keys(alteracoes).map(k => [k, c[k] || '']));
-      registro.depois = { ...alteracoes };
+      let entradaObservacoes = p.observacoes;
+      if (entradaObservacoes === undefined && Array.isArray(c.observacoes) && c.observacoes.length <= 1 && alteracoes.observacao !== (c.observacao || '')) {
+        entradaObservacoes = [{...(c.observacoes[0] || {}),texto:alteracoes.observacao,material:c.observacoes[0]?.material || ''}];
+      }
+      if (entradaObservacoes !== undefined) {
+        const notas = prepararObservacoes(c, entradaObservacoes, p.operacaoId);
+        alteracoes.observacao = notas.resumo; alteracoes.observacoes = notas.lista;
+        registro.observacoesAlteradas = notas.alteradas;
+      } else if (Array.isArray(c.observacoes) && alteracoes.observacao !== (c.observacao || '')) {
+        throw new Error('Atualize o aplicativo para editar as observações numeradas.');
+      }
+      registro.antes = Object.fromEntries(Object.keys(alteracoes).filter(k => k !== 'observacoes').map(k => [k, c[k] || '']));
+      registro.depois = Object.fromEntries(Object.entries(alteracoes).filter(([k]) => k !== 'observacoes'));
       registro.assinatura = assinatura;
       registro.militar = texto(p.militarRetirada ?? p.militar, 'Militar');
       registro.motivo = texto(p.motivo, 'Motivo', 1000, false);

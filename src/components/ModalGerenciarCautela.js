@@ -1,3 +1,5 @@
+import EditorObservacoes from './EditorObservacoes';
+import { observacoesCautela, prepararObservacoes } from '../utils/observacoes.mjs';
 import { avisar } from '../utils/avisar';
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, Alert, Image } from 'react-native';
@@ -16,6 +18,7 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
   const podeAdicionar = !cautela.dataEntrega && cautela.estoqueDevolvido !== true && !!cautela.assinaturaCautela;
   const [om, setOm] = useState(cautela.om || '');
   const [obs, setObs] = useState(modo === 'editar' ? cautela.observacao || '' : '');
+  const [observacoes, setObservacoes] = useState(()=>observacoesCautela(cautela));
   const [previsao, setPrevisao] = useState(cautela.previsaoDevolucao || '');
   const [novos, setNovos] = useState([]);
   const [quantidades, setQuantidades] = useState({});
@@ -40,14 +43,14 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
       await salvarMovimentacao(db, { tipo: modo, cautelaId: cautela.id, operacaoId: id.current,
         uid: auth.currentUser?.uid, operador, assinatura, itens: novos,
         quantidades, militar, militarRetirada, om, observacao: obs, revisao: cautela.revisao || 0,
-        previsaoDevolucao: previsao, dataHoje: new Date().toLocaleDateString('pt-BR') });
+        ...(modo === 'editar' ? {observacoes} : {}), previsaoDevolucao: previsao, dataHoje: new Date().toLocaleDateString('pt-BR') });
       fechar(); avisar('Sucesso', 'Operação registrada com histórico.');
     } finally { trava.current = false; setSalvando(false); }
   };
   const continuar = async () => {
     try {
       texto(operador, 'Militar SecOp');
-      if (modo === 'editar') { texto(militar, 'Titular'); texto(militarRetirada, 'Militar'); if (novos.length) normalizarItens(novos); }
+      if (modo === 'editar') { prepararObservacoes(cautela, observacoes, id.current); texto(militar, 'Titular'); texto(militarRetirada, 'Militar'); if (novos.length) normalizarItens(novos); }
       if (modo === 'adicionar') { texto(militar, 'Militar que está cautelando'); normalizarItens(novos); }
       if (modo === 'devolver') prepararDevolucao(cautela, quantidades);
       if (modo === 'excluir') await salvar('');
@@ -60,14 +63,14 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
   if (assinando) return <ModalAssinatura fechar={() => setAssinando(false)} handleAssinatura={salvar} refAssinatura={refAssinatura} tipoOperacao="acrescimo"
     titulo={['devolver','assinar_devolucao'].includes(modo) ? 'Assinatura da devolução' : 'Assinar edição'}
     descricao={['editar','adicionar'].includes(modo)
-      ? `${militarRetirada} · Militar SecOp: ${operador}. Titular: ${militar}; OM: ${om || '—'}; Previsão: ${previsao || '—'}; Observação: ${obs || '—'}. ${novos.length ? 'Adicionar: ' + novos.map(m => `${m.nome}: ${m.quantidade}`).join('; ') : 'Sem novos materiais'}. Confira e assine.`
-      : `${cautela.militar} — ${modo === 'assinar_devolucao' ? 'Assinatura da devolução registrada' : itens.filter(m => Number(quantidades[m.linhaId]) > 0).map(m => `${m.nome}: ${quantidades[m.linhaId]}`).join('; ')}` } />;
+      ? `${militarRetirada} · Militar SecOp: ${operador}. Titular: ${militar}; OM: ${om || '—'}; Previsão: ${previsao || '—'}; ${observacoes.map((o,i)=>`OBS ${i+1}: ${o.texto}`).join('; ')}. ${novos.length ? 'Adicionar: ' + novos.map(m => `${m.nome}: ${m.quantidade}`).join('; ') : 'Sem novos materiais'}. Confira e assine.`
+      : `${militarRetirada} — ${modo === 'assinar_devolucao' ? 'Assinatura da devolução registrada' : itens.filter(m => Number(quantidades[m.linhaId]) > 0).map(m => `${m.nome}: ${quantidades[m.linhaId]}`).join('; ')}` } />;
   return <Modal visible transparent animationType="slide" onRequestClose={() => !salvando && fechar()}>
     <View style={styles.modalOverlay}><View style={styles.modalContent}><ScrollView keyboardShouldPersistTaps="handled">
       <Text style={styles.modalTitle}>{{ assinar_devolucao: 'Assinar devolução já registrada', adicionar: 'Adicionar materiais', editar: 'Editar cautela', devolver: 'Devolver materiais', detalhes: 'Detalhes e histórico', excluir: 'Excluir cautela' }[modo]}</Text>
       <Text style={[styles.cartaoTexto, { marginBottom: 12 }]}>{cautela.militar} — retirada: {cautela.dataCautela}</Text>
       {!!erroLegado && <Text style={{ color: '#FCA5A5' }}>Registro antigo requer conferência: {erroLegado}. Nenhum saldo será alterado por suposição.</Text>}
-      {['editar','adicionar'].includes(modo) && campo('Militar', militarRetirada, setMilitarRetirada)}
+      {['editar','adicionar','devolver'].includes(modo) && campo('Militar', militarRetirada, setMilitarRetirada)}
       {modo !== 'detalhes' && campo('Militar SecOp', operador, setOperador)}
       {modo === 'editar' && <>
         {campo('Titular', militar, setMilitar)}{campo('OM', om, setOm)}
@@ -85,7 +88,8 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
           <TextInput accessibilityLabel={`Devolver ${m.nome}`} style={styles.input} keyboardType="numeric" value={String(quantidades[m.linhaId] || '')} placeholder="Quantidade a devolver" placeholderTextColor="#94A3B8" onChangeText={v => setQuantidades(a => ({ ...a, [m.linhaId]: v || 0 }))} />
         </View>)}
       </>}
-      {['editar','devolver'].includes(modo) && campo('Observação', obs, setObs, true)}
+      {modo === 'editar' && <EditorObservacoes value={observacoes} onChange={setObservacoes} existentes={observacoesCautela(cautela).length} materiais={[...itens,...novos]} />}
+      {modo === 'devolver' && campo('Observação', obs, setObs, true)}
       {modo === 'excluir' && <Text style={styles.cartaoTexto}>A cautela sairá do Livro. Somente os saldos pendentes com baixa de estoque comprovada serão repostos. O registro e as assinaturas serão preservados para auditoria.</Text>}
       {modo === 'detalhes' && <>
         {itens.map(m => <Text key={m.linhaId} style={styles.cartaoTexto}>{m.nome}: {m.quantidade} retirado(s), {m.pendente} pendente(s)</Text>)}
@@ -97,7 +101,8 @@ export default function ModalGerenciarCautela({ cautela, modo, estoque, fechar, 
         {historico?.map(h => <View key={h.id} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: '#475569' }}>
           <Text style={styles.cartaoTexto}>{h.em?.toDate?.().toLocaleString('pt-BR') || 'Horário não disponível'} — {h.tipo} — {h.operador}</Text>
           {h.itens?.map((m,i) => <Text key={i} style={styles.cartaoTexto}>{m.nome}: {m.quantidade}</Text>)}
-          {h.antes && Object.keys(h.antes).filter(k => h.antes[k] !== h.depois[k]).map(k => <Text key={k} style={styles.cartaoTexto}>{{militar:'Militar',om:'OM',observacao:'Observação',previsaoDevolucao:'Previsão de devolução'}[k] || k}: {h.antes[k] || '(vazio)'} → {h.depois[k] || '(vazio)'}</Text>)}
+          {h.antes && Object.keys(h.antes).filter(k => h.antes[k] !== h.depois[k] && !(k === 'observacao' && h.observacoesAlteradas)).map(k => <Text key={k} style={styles.cartaoTexto}>{{militar:'Militar',om:'OM',observacao:'Observação',previsaoDevolucao:'Previsão de devolução'}[k] || k}: {h.antes[k] || '(vazio)'} → {h.depois[k] || '(vazio)'}</Text>)}
+          {h.observacoesAlteradas?.map(o => <Text key={o.id} style={styles.cartaoTexto}>OBS {o.numero}: {o.antes ? `${o.antes.texto || '(vazio)'} → ` : ''}{o.depois.texto || '(vazio)'}{o.depois.material ? ` · ${o.depois.material}` : ''}</Text>)}
           {!!h.motivo && <Text style={styles.cartaoTexto}>Motivo: {h.motivo}</Text>}
           {!!h.assinatura && <Image accessibilityLabel="Assinatura desta operação" source={{ uri: h.assinatura }} style={{ width: '100%', height: 70, backgroundColor: '#fff', marginTop: 8 }} resizeMode="contain" />}
         </View>)}

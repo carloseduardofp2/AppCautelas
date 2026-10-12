@@ -1,3 +1,5 @@
+import EditorObservacoes from './EditorObservacoes';
+import { prepararObservacoes } from '../utils/observacoes.mjs';
 import { avisar } from '../utils/avisar';
 import React from 'react';
 import CampoData from './CampoData';
@@ -11,7 +13,7 @@ export default function ModalNovaCautela({
   novoMilitar, setNovoMilitar,
   novaOm, setNovaOm,
   materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
-  novaObs, setNovaObs,
+  novasObservacoes, setNovasObservacoes,
   novoMilSecOpCautela, setNovoMilSecOpCautela,
   dataSelecionada, mostrarCalendario,
   setMostrarCalendario, aoMudarData,
@@ -47,6 +49,7 @@ export default function ModalNovaCautela({
       }
     }
 
+    try { prepararObservacoes({}, novasObservacoes, 'validacao'); } catch(e) { avisar('Observações',e.message); return false; }
     return true;
   };
 
@@ -114,15 +117,7 @@ export default function ModalNovaCautela({
 
               <CampoData value={`${dataSelecionada.getFullYear()}-${String(dataSelecionada.getMonth()+1).padStart(2,'0')}-${String(dataSelecionada.getDate()).padStart(2,'0')}`} onChange={v => { if (v) aoMudarData({ type: 'set' }, new Date(`${v}T12:00:00`)); }} limpavel={false} label="Data da retirada" />
 
-              <TextInput
-                style={[styles.input, styles.inputArea]}
-                placeholder="Observação da Cautela..."
-                placeholderTextColor="#64748B"
-                multiline={true}
-                numberOfLines={3}
-                value={novaObs}
-                onChangeText={setNovaObs}
-              />
+              <EditorObservacoes value={novasObservacoes} onChange={setNovasObservacoes} materiais={materiaisCautela} />
 
               <View style={styles.modalBotoes}>
                 <TouchableOpacity style={styles.btnCancelar} onPress={fechar}>

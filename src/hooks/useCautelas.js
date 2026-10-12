@@ -57,6 +57,7 @@ export function useCautelas() {
     const [previsaoDevolucao, setPrevisaoDevolucao] = useState('');
     const operacaoIdRef = useRef(null);
     const [novaObs, setNovaObs] = useState('');
+    const [novasObservacoes, setNovasObservacoes] = useState([]);
     const [novoMilSecOpCautela, setNovoMilSecOpCautela] = useState('');
     const aoCriarCautelaRef = useRef(null);
     const operacaoEmAndamentoRef = useRef(false);
@@ -252,10 +253,10 @@ export function useCautelas() {
             if (operacao === 'criar') {
                 await salvarMovimentacao(db, { tipo: 'criar', operacaoId: id,
                     operador: novoMilSecOpCautela, uid: auth.currentUser?.uid, assinatura: signature,
-                    militar: novoMilitar, om: novaOm, observacao: novaObs, previsaoDevolucao,
+                    militar: novoMilitar, om: novaOm, observacao: novaObs, observacoes:novasObservacoes, previsaoDevolucao,
                     dataCautela: dataSelecionada.toLocaleDateString('pt-BR'),
                     itens: materiaisCautela.filter(m => String(m.nome || '').trim()) });
-                setNovoMilitar(''); setNovaOm(''); setNovaObs(''); setPrevisaoDevolucao('');
+                setNovoMilitar(''); setNovaOm(''); setNovaObs(''); setNovasObservacoes([]); setPrevisaoDevolucao('');
                 setMateriaisCautela([{ nome: '', quantidade: '' }]); setNovoMilSecOpCautela('');
                 aoCriarCautelaRef.current?.(); aoCriarCautelaRef.current = null;
             } else if (operacao === 'assinar_pendente') {
@@ -342,7 +343,7 @@ export function useCautelas() {
         novaOm, setNovaOm,
         materiaisCautela, adicionarLinhaMaterial, removerLinhaMaterial, atualizarLinhaMaterial,
         selecionarMaterial: m => setMateriaisCautela(prev => [...prev.filter(i => i.nome.trim()), m]),
-        novaObs, setNovaObs,
+        novaObs, setNovaObs, novasObservacoes, setNovasObservacoes,
         novoMilSecOpCautela, setNovoMilSecOpCautela,
         tipoOperacao, setTipoOperacao,
         idCautelaParaAssinar, setIdCautelaParaAssinar,
