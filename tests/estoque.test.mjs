@@ -60,3 +60,28 @@ test('PDF apresenta observação vigente uma vez e mantém edição identificada
  assert.ok(html.includes('Edição 1'));assert.equal(c.dadosOriginais.observacao,'Texto antigo repetido');
  const vazio=gerarHtmlLivro([{...c,observacao:'',historico:[{...c.historico[0],depois:{observacao:''}}]}]);assert.ok(vazio.includes('Sem observações.'));
 });
+
+test('exportação carrega históricos em paralelo limitado e preserva ordem e assinaturas',async()=>{
+ const {carregarHistoricosParaPDF}=await import('../src/utils/exportacao.mjs');
+ const lista=Array.from({length:14},(_,i)=>({id:String(i),assinaturaCautela:`assinatura-${i}`}));
+ let ativos=0,pico=0;const progressos=[];
+ const completos=await carregarHistoricosParaPDF(lista,async id=>{
+  pico=Math.max(pico,++ativos);await new Promise(r=>setTimeout(r,Number(id)%2?1:5));ativos--;
+  return [{id:`historico-${id}`,assinatura:`edicao-${id}`}];
+ },n=>progressos.push(n));
+ assert.equal(pico,6);assert.deepEqual(completos.map(c=>c.id),lista.map(c=>c.id));
+ for(const c of completos){assert.equal(c.assinaturaCautela,`assinatura-${c.id}`);assert.equal(c.historico[0].assinatura,`edicao-${c.id}`);}
+ assert.deepEqual(progressos,Array.from({length:15},(_,i)=>i));assert.equal(lista[0].historico,undefined);
+ await assert.rejects(carregarHistoricosParaPDF(lista,async()=>{throw Error('Sem conexão');}),/Sem conexão/);
+ assert.deepEqual(await carregarHistoricosParaPDF([],()=>{throw Error('Não deveria ler');}),[]);
+});
+
+test('impressão aguarda carregamento das assinaturas e fontes',async()=>{
+ const {aguardarImagens}=await import('../src/utils/exportacao.mjs');
+ const pendente=new EventTarget();pendente.complete=false;
+ let terminou=false;let fontes;
+ const pronto=aguardarImagens({images:[{complete:true},pendente],fonts:{ready:new Promise(r=>{fontes=r;})}}).then(()=>{terminou=true;});
+ await Promise.resolve();assert.equal(terminou,false);
+ pendente.dispatchEvent(new Event('load'));await Promise.resolve();assert.equal(terminou,false);
+ fontes();await pronto;assert.equal(terminou,true);
+});

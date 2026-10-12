@@ -4,7 +4,8 @@ import { Alert, Platform } from 'react-native';
 import { auth, db } from '../services/firebaseConfig';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { removerAcentos } from '../utils/formatters';
-import { exportarParaPDF } from '../services/pdfService';
+import { carregarHistoricosParaPDF } from '../utils/exportacao.mjs';
+import { exportarParaPDF, prepararGeradorPDF } from '../services/pdfService';
 import { salvarMovimentacao, novaOperacaoId, carregarHistorico } from '../services/cautelaService';
 
 // 🔥 Função única de conversão de data "dd/mm/aaaa" -> timestamp.
@@ -275,17 +276,21 @@ export function useCautelas() {
         } finally { operacaoEmAndamentoRef.current = false; }
     };
 
+    const exportacaoEmAndamento = useRef(false);
     const exportarComHistorico = async lista => {
-        if (isExportando) return;
+        if (exportacaoEmAndamento.current) return;
+        exportacaoEmAndamento.current = true;
+        prepararGeradorPDF();
         setIsExportando(true);
         const janela = Platform.OS === 'web' ? window.open('', '_blank') : null;
         if (janela) janela.document.body.textContent = 'Preparando o PDF com histórico…';
         try {
-            const completos = [];
-            for (const c of lista) completos.push({ ...c, historico: await carregarHistorico(db, c.id) });
+            const completos = await carregarHistoricosParaPDF(lista, id => carregarHistorico(db, id), (n,total) => {
+                if (janela && !janela.closed) janela.document.body.textContent = `Preparando PDF: ${n}/${total} cautelas…`;
+            });
             await exportarParaPDF(completos, false, setIsExportando, janela);
         } catch (e) { janela?.close(); avisar('PDF não gerado', 'Não foi possível carregar o histórico completo. Confira a conexão.'); }
-        finally { setIsExportando(false); }
+        finally { exportacaoEmAndamento.current = false; setIsExportando(false); }
     };
 
     const abrirMenuExportacao = () => {

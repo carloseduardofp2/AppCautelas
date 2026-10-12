@@ -1,10 +1,21 @@
 import { avisar } from '../utils/avisar';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { gerarHtmlLivro } from '../utils/pdfHtml.mjs';
 
-// ... (suas outras funções compartilharOuBaixarPDF e downloadBlob continuam aqui)
+import { aguardarImagens } from '../utils/exportacao.mjs';
+
+let geradorPendente;
+const carregarGerador = () => geradorPendente ||= import('html2pdf.js').catch(e => { geradorPendente = null; throw e; });
+function podeCompartilharArquivo() {
+  if (Platform.OS !== 'web' || !/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || !navigator.canShare) return false;
+  try { return navigator.canShare({files:[new File(['%PDF-1.4'], 'livro_cautelas.pdf', {type:'application/pdf'})]}); }
+  catch { return false; }
+}
+export function prepararGeradorPDF() {
+  if (podeCompartilharArquivo()) void carregarGerador().catch(() => {});
+}
 
 export async function exportarParaPDF(listaCautelas, isExportando, setIsExportando, janelaPreparada = null) {
   if (isExportando) return;
@@ -14,10 +25,9 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
     const html = gerarHtmlLivro(listaCautelas);
     // --- SOLUÇÃO HÍBRIDA (WEB E CELULAR) ---
     if (Platform.OS === 'web') {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
       // 🔥 1. FLUXO EXCLUSIVO PARA CELULAR WEB (WhatsApp)
-      if (isMobile && navigator.canShare) {
+      if (podeCompartilharArquivo()) {
         try {
           const container = document.createElement('div');
           container.innerHTML = html;
@@ -32,8 +42,8 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape fica melhor para tabelas longas
           };
 
-          // Gera o Blob nos bastidores (demora cerca de 1 a 2 segundos dependendo das assinaturas)
-          const { default: html2pdf } = await import('html2pdf.js');
+          // O módulo já começa a carregar durante a busca dos históricos.
+          const { default: html2pdf } = await carregarGerador();
           const pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
           
           // Transforma o Blob em um File que a Web Share API entenda
@@ -70,24 +80,10 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
         janelaImpressao.document.write(html);
         janelaImpressao.document.close();
 
-        let jaImprimiu = false;
-        const dispararImpressao = () => {
-            if (jaImprimiu) return;
-            jaImprimiu = true;
-            try {
-                janelaImpressao.focus();
-                janelaImpressao.print();
-                janelaImpressao.onafterprint = () => janelaImpressao.close();
-            } catch (printError) {
-                console.error("Erro ao imprimir:", printError);
-                avisar("Erro", "Não foi possível abrir a janela de impressão.");
-            } finally {
-                setIsExportando(false);
-            }
-        };
-
-        janelaImpressao.onload = () => setTimeout(dispararImpressao, 300);
-        setTimeout(dispararImpressao, 4000); 
+        await aguardarImagens(janelaImpressao.document);
+        janelaImpressao.focus();
+        janelaImpressao.onafterprint = () => janelaImpressao.close();
+        janelaImpressao.print();
       } catch (webError) {
           console.error("Erro na exportação (web):", webError);
           avisar("Erro", "Não foi possível gerar o PDF.");
