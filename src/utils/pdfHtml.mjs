@@ -7,7 +7,7 @@ const hora = h => h?.em?.toDate ? h.em.toDate().toLocaleString('pt-BR',{timeZone
 const mudou = (h,k) => h.antes && Object.hasOwn(h.antes,k) && h.antes[k] !== h.depois?.[k];
 
 export function gerarHtmlLivro(lista) {
- const blocos=lista.map((c,index)=>{
+ const blocos=lista.map(c=>{
   const original=c.dadosOriginais || c;
   const notas=observacoesCautela(c);
   const historico=c.historico || [];
@@ -33,7 +33,7 @@ export function gerarHtmlLivro(lista) {
    }
   });
   if(c.dataEntrega && !devolucoes.some(h=>h.completa)) operacoes.push({titulo:'Devolução total',data:c.dataEntrega,itens:[],militar:'Não registrado',secop:c.milSecOp,assinatura:'-',final:img(c.assinaturaDevolucao),notas:[]});
-  const cabecalho=`<tr class="identidade"><th colspan="4">CAUTELA ${escapar(c.id || String(index+1).padStart(3,'0'))} · ${escapar(c.militar)}${c.om?' · '+escapar(c.om):''}</th><th colspan="3">${c.previsaoDevolucao?`<b>Previsão:</b> ${escapar(formatarPrevisao(c.previsaoDevolucao))} · `:''}${c.dataEntrega?'Devolvida':'Pendente'}</th></tr><tr><th>Operação / Data</th><th>Material</th><th>Qtd.</th><th>Militar</th><th>Assinatura<br><small>Retirada / Edições</small></th><th>Militar SecOp</th><th>Assinatura<br><small>Devolução total</small></th></tr>`;
+  const cabecalho=`<tr class="identidade"><th colspan="4">${escapar(c.militar)}${c.om?' · '+escapar(c.om):''}</th><th colspan="3">${c.previsaoDevolucao?`<b>Previsão:</b> ${escapar(formatarPrevisao(c.previsaoDevolucao))} · `:''}${c.dataEntrega?'Devolvida':'Pendente'}</th></tr><tr><th>Operação / Data</th><th>Material</th><th>Qtd.</th><th>Militar</th><th>Assinatura<br><small>Retirada / Edições</small></th><th>Militar SecOp</th><th>Assinatura<br><small>Devolução total</small></th></tr>`;
   const linhas=operacoes.map(op=>{
    const materiais=op.itens.length?op.itens:[{nome:'-',quantidade:'-'}];
    let html='';
@@ -64,7 +64,7 @@ export function gerarHtmlLivro(lista) {
   if(!notasHtml.length)notasHtml.push('Sem observações.');
   if(!retornos.length)retornos.push(c.dataEntrega?'Sem observações no retorno.':'Aguardando devolução.');
   const observacoes=Array.from({length:Math.max(notasHtml.length,retornos.length)},(_,i)=>`<tbody class="nota"><tr><td>${notasHtml[i] || ''}</td><td>${retornos[i] || ''}</td></tr></tbody>`).join('');
-  return `<section class="cautela"><table class="movimentos"><colgroup>${[13,22.5,5,14.5,15,14,16].map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>${cabecalho}</thead>${linhas}</table><table class="notas"><colgroup><col style="width:64%"><col style="width:36%"></colgroup><thead><tr><th>Observações <small>· ${escapar(c.id || String(index+1).padStart(3,'0'))}</small></th><th>Observações Militar SecOp</th></tr></thead>${observacoes}</table></section>`;
+  return `<section class="cautela"><table class="movimentos"><colgroup>${[13,22.5,5,14.5,15,14,16].map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>${cabecalho}</thead>${linhas}</table><table class="notas"><colgroup><col style="width:64%"><col style="width:36%"></colgroup><thead><tr><th>Observações</th><th>Observações Militar SecOp</th></tr></thead>${observacoes}</table></section>`;
  }).join('');
  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Livro de Cautelas — SecOp</title><style>
  @page{size:A4 landscape;margin:9mm}body{font-family:Arial,sans-serif;color:#172334;margin:0}h1{text-align:center;font-size:19px;margin:0 0 5px}h3{text-align:center;font-size:11px;font-weight:normal;margin:0 0 16px}
