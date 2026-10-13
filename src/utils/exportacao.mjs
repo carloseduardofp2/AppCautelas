@@ -29,3 +29,5 @@ export async function aguardarImagens(documento) {
     })));
   if (documento.fonts?.ready) await documento.fonts.ready;
 }
+
+export const ehNavegadorMovel = userAgent => /iPhone|iPad|iPod|Android/i.test(userAgent || '');

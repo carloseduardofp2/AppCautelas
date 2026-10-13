@@ -4,17 +4,17 @@ import * as Print from 'expo-print';
 import { Platform } from 'react-native';
 import { gerarHtmlLivro } from '../utils/pdfHtml.mjs';
 
-import { aguardarImagens } from '../utils/exportacao.mjs';
+import { aguardarImagens, ehNavegadorMovel } from '../utils/exportacao.mjs';
 
 let geradorPendente;
 const carregarGerador = () => geradorPendente ||= import('html2pdf.js').catch(e => { geradorPendente = null; throw e; });
 function podeCompartilharArquivo() {
-  if (Platform.OS !== 'web' || !/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || !navigator.canShare) return false;
+  if (Platform.OS !== 'web' || !ehNavegadorMovel(navigator.userAgent) || !navigator.canShare) return false;
   try { return navigator.canShare({files:[new File(['%PDF-1.4'], 'livro_cautelas.pdf', {type:'application/pdf'})]}); }
   catch { return false; }
 }
 export function prepararGeradorPDF() {
-  if (podeCompartilharArquivo()) void carregarGerador().catch(() => {});
+  if (Platform.OS === 'web' && ehNavegadorMovel(navigator.userAgent)) void carregarGerador().catch(() => {});
 }
 
 export async function exportarParaPDF(listaCautelas, isExportando, setIsExportando, janelaPreparada = null) {
@@ -26,46 +26,49 @@ export async function exportarParaPDF(listaCautelas, isExportando, setIsExportan
     // --- SOLUÇÃO HÍBRIDA (WEB E CELULAR) ---
     if (Platform.OS === 'web') {
 
-      // 🔥 1. FLUXO EXCLUSIVO PARA CELULAR WEB (WhatsApp)
-      if (podeCompartilharArquivo()) {
+      // O Android pode ignorar @page landscape na tela de impressão. No celular,
+      // geramos o arquivo A4 horizontal antes de abrir o compartilhamento ou download.
+      if (ehNavegadorMovel(navigator.userAgent)) {
         try {
           const container = document.createElement('div');
           container.innerHTML = html;
-
-          // Configurações para a geração silenciosa do PDF
-          const opt = {
-            margin:       5,
-            filename:     'livro_cautelas.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape fica melhor para tabelas longas
-          };
-
-          // O módulo já começa a carregar durante a busca dos históricos.
           const { default: html2pdf } = await carregarGerador();
-          const pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
-          
-          // Transforma o Blob em um File que a Web Share API entenda
-          const file = new File([pdfBlob], 'livro_cautelas.pdf', { type: 'application/pdf' });
-
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: 'Livro de Cautelas',
-              text: 'Segue o PDF do livro de cautelas gerado.'
-            });
-            janelaPreparada?.close();
-            setIsExportando(false);
-            return; // 🛑 Sucesso! Finaliza a função aqui.
+          const pdfBlob = await html2pdf().set({
+            margin: 5,
+            filename: 'livro_cautelas.pdf',
+            image: { type: 'jpeg', quality: 0.92 },
+            html2canvas: { scale: 1.5 },
+            pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+          }).from(container).outputPdf('blob');
+          const arquivo = new File([pdfBlob], 'livro_cautelas.pdf', { type: 'application/pdf' });
+          if (podeCompartilharArquivo() && navigator.canShare({ files: [arquivo] })) {
+            try {
+              await navigator.share({ files: [arquivo], title: 'Livro de Cautelas' });
+              janelaPreparada?.close();
+              return;
+            } catch (e) {
+              if (e.name === 'AbortError') { janelaPreparada?.close(); return; }
+              // Se o compartilhamento falhar, ainda é possível salvar o arquivo.
+            }
           }
-        } catch (err) {
-          console.error("Erro ao gerar/compartilhar PDF oculto via html2pdf:", err);
-          // Se der erro ou o usuário cancelar, deixamos cair para o código original do PC como fallback de segurança
+          const url = URL.createObjectURL(pdfBlob);
+          setTimeout(() => URL.revokeObjectURL(url), 300000);
+          if (janelaPreparada && !janelaPreparada.closed) janelaPreparada.location.replace(url);
+          else {
+            const link = document.createElement('a');
+            link.href = url; link.download = 'livro_cautelas.pdf';
+            document.body.appendChild(link); link.click(); link.remove();
+          }
+        } catch (error) {
+          console.error('Erro ao gerar PDF horizontal no celular:', error);
+          janelaPreparada?.close();
+          avisar('PDF não gerado', 'Não foi possível preparar o arquivo. Tente novamente.');
         }
+        return;
       }
 
-      // 🔥 2. FLUXO ORIGINAL PARA PC (Mantido intacto)
+      // Impressão no computador.
       try {
         const janelaImpressao = janelaPreparada || window.open('', '_blank');
 

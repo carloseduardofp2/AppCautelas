@@ -85,3 +85,9 @@ test('impressão aguarda carregamento das assinaturas e fontes',async()=>{
  pendente.dispatchEvent(new Event('load'));await Promise.resolve();assert.equal(terminou,false);
  fontes();await pronto;assert.equal(terminou,true);
 });
+
+test('reconhece Android para gerar arquivo PDF mesmo sem compartilhamento direto',async()=>{
+ const {ehNavegadorMovel}=await import('../src/utils/exportacao.mjs');
+ assert.equal(ehNavegadorMovel('Mozilla/5.0 (Linux; Android 16; SM-S731B) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36'),true);
+ assert.equal(ehNavegadorMovel('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'),false);
+});
